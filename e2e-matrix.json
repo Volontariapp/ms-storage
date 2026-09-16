@@ -3,5 +3,6 @@
   "ms-post": "main",
   "ms-event": "main",
   "ms-social": "main",
-  "ms-storage": "main"
+  "ms-storage": "main",
+  "ms-user": "main"
 }
