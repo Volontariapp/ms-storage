@@ -1,0 +1,13 @@
+{
+  "db": {
+    "host": "localhost",
+    "port": 5437,
+    "username": "user",
+    "password": "password",
+    "database": "ms_storage"
+  },
+  "logger": {
+    "level": "debug",
+    "format": "text"
+  }
+}

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: Volontariapp/ci-tools/.github/workflows/service-ci.yml@main
+    with:
+      service-name: ms-storage
+    secrets: inherit
+
+  ci-docker:
+    needs: ci
+    permissions:
+      contents: read
+      packages: write
+    uses: Volontariapp/ci-tools/.github/workflows/service-docker-build-push.yml@main
+    with:
+      service-name: ms-storage
+    secrets: inherit
+
+  e2e:
+    needs: [ci-docker]
+    uses: Volontariapp/ci-tools/.github/workflows/e2e-orchestrator.yml@main
+    secrets: inherit
+
+  validate-e2e-matrix:
+    uses: Volontariapp/ci-tools/.github/workflows/e2e-matrix-checker.yml@main
+    with:
+      service-name: ms-storage
+
+  deploy-push:
+    name: Deploy Repo Submodule Push (ms-storage)
+    needs: [ci-docker, e2e]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Update Deploy Submodule and Images
+        uses: Volontariapp/ci-tools/.github/actions/update-deploy@main
+        with:
+          service: ms-storage
+          sha: ${{ github.sha }}
+          org-repo-token: ${{ secrets.ORG_REPO_TOKEN }}
+          image-match: 'ghcr.io/volontariapp/ms-storage'

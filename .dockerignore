@@ -1,0 +1,59 @@
+# ==========================================================
+# DEPENDENCIES & PACKAGE MANAGERS
+# ==========================================================
+node_modules/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/install-state.gz
+
+
+# ==========================================================
+# BUILD OUTPUTS & TEMPORARY FILES
+# ==========================================================
+dist/
+build/
+coverage/
+.cache/
+
+# ==========================================================
+# CONFIGURATION & TOOLS (IDE, LINTERS)
+# ==========================================================
+.vscode/
+.editorconfig
+.prettierrc
+eslint.config.mjs
+tsconfig.build.json
+nest-cli.json
+.claude/
+*.md
+
+# ==========================================================
+# DOCKER & CI/CD
+# ==========================================================
+dockerfile
+Dockerfile
+.github/
+docker-compose.yml
+
+# ==========================================================
+# GIT & VERSION CONTROL
+# ==========================================================
+.git/
+.gitignore
+.gitmodules
+
+# ==========================================================
+# MONOREPO / OTHER SERVICES
+# (On ignore les autres micro-services pour isoler celui-ci)
+# ==========================================================
+npm-packages/
+api-gateway/
+nativapp/
+ms-*/
+!ms-storage/
+
+# ==========================================================
+# SECRETS & ENVIRONMENTS (CRITICAL)
+# ==========================================================
+.env
+.env.*
