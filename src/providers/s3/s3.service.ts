@@ -9,19 +9,17 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { AppConfigService } from '../../config/app-config.service.js';
+import type {
+  GeneratePresignedUploadUrlOptions,
+  GeneratePresignedDownloadUrlOptions,
+  S3ObjectOptions,
+} from './interfaces/index.js';
 
-export interface GeneratePresignedUploadUrlOptions {
-  key: string;
-  contentType: string;
-}
-
-export interface GeneratePresignedDownloadUrlOptions {
-  key: string;
-}
-
-export interface S3ObjectOptions {
-  key: string;
-}
+export type {
+  GeneratePresignedUploadUrlOptions,
+  GeneratePresignedDownloadUrlOptions,
+  S3ObjectOptions,
+};
 
 @Injectable()
 export class S3Service {
