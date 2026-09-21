@@ -4,8 +4,13 @@ import { CreateBucketCommand } from '@aws-sdk/client-s3';
 import { S3Service } from './s3.service.js';
 import type { AppConfigService } from '../../config/app-config.service.js';
 
-describe('S3Service MinIO (Integration)', () => {
+describe('S3Service MinIO E2E Lifecycle (Integration)', () => {
   let s3Service: S3Service;
+  let minioAvailable = false;
+  const testBucket = 'volontariapp-test-files';
+  const testKey = `it-tests/sample-${Date.now()}.txt`;
+  const fileContent = 'Hello Volontariapp S3 MinIO Integration Test!';
+  const contentType = 'text/plain';
 
   beforeAll(async () => {
     const mockAppConfig = {
@@ -14,55 +19,72 @@ describe('S3Service MinIO (Integration)', () => {
         region: 'us-east-1',
         accessKey: process.env.S3_ACCESS_KEY ?? 'minioadmin',
         secretKey: process.env.S3_SECRET_KEY ?? 'minioadmin',
-        publicBucket: 'volontariapp-test-files',
+        publicBucket: testBucket,
         presignedUrlTtl: 900,
         usePathStyle: true,
       },
     } as unknown as AppConfigService;
 
     s3Service = new S3Service(mockAppConfig);
-  });
 
-  it('should generate valid presigned upload URL for MinIO', async () => {
-    const uploadUrl = await s3Service.generatePresignedUploadUrl({
-      key: 'test/sample-image.jpg',
-      contentType: 'image/jpeg',
-    });
-
-    expect(uploadUrl).toBeDefined();
-    expect(uploadUrl).toContain('volontariapp-test-files/test/sample-image.jpg');
-    expect(uploadUrl).toContain('X-Amz-Signature');
-  });
-
-  it('should generate valid presigned download URL for MinIO', async () => {
-    const downloadUrl = await s3Service.generatePresignedDownloadUrl({
-      key: 'test/sample-image.jpg',
-    });
-
-    expect(downloadUrl).toBeDefined();
-    expect(downloadUrl).toContain('volontariapp-test-files/test/sample-image.jpg');
-  });
-
-  it('should handle MinIO object existence check and return false for non-existent key', async () => {
     try {
       const client = s3Service.getClient();
-      await client.send(
-        new CreateBucketCommand({
-          Bucket: 'volontariapp-test-files',
-        }),
-      );
+      await client.send(new CreateBucketCommand({ Bucket: testBucket }));
+      minioAvailable = true;
     } catch {
-      // Bucket may already exist or MinIO offline
+      try {
+        minioAvailable = !(await s3Service.doesObjectExist({ key: 'ping-check-non-existent.txt' }));
+      } catch {
+        minioAvailable = false;
+      }
+    }
+  });
+
+  it('should complete a full E2E lifecycle: Presigned Upload -> HTTP PUT -> Head Object -> Presigned Download -> HTTP GET -> Delete Object', async () => {
+    if (!minioAvailable) {
+      console.warn('MinIO server is not available locally. Skipping live HTTP S3 test.');
+      return;
     }
 
-    try {
-      const exists = await s3Service.doesObjectExist({
-        key: 'non-existent-key-123456.jpg',
-      });
-      expect(exists).toBe(false);
-    } catch (err: unknown) {
-      // If MinIO server is not running on localhost, catch connection error gracefully
-      expect((err as { code?: string }).code ?? (err as Error).message).toBeDefined();
-    }
+    // 1. Generate Presigned Upload URL
+    const uploadUrl = await s3Service.generatePresignedUploadUrl({
+      key: testKey,
+      contentType,
+    });
+    expect(uploadUrl).toBeDefined();
+    expect(uploadUrl).toContain(testBucket);
+
+    // 2. Perform HTTP PUT upload directly to MinIO
+    const putResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': contentType,
+      },
+      body: fileContent,
+    });
+    expect(putResponse.status).toBe(200);
+
+    // 3. Verify object exists via HeadObject (doesObjectExist)
+    const existsAfterUpload = await s3Service.doesObjectExist({ key: testKey });
+    expect(existsAfterUpload).toBe(true);
+
+    // 4. Generate Presigned Download URL
+    const downloadUrl = await s3Service.generatePresignedDownloadUrl({
+      key: testKey,
+    });
+    expect(downloadUrl).toBeDefined();
+
+    // 5. Perform HTTP GET download directly from MinIO
+    const getResponse = await fetch(downloadUrl);
+    expect(getResponse.status).toBe(200);
+    const downloadedText = await getResponse.text();
+    expect(downloadedText).toBe(fileContent);
+
+    // 6. Delete object from MinIO
+    await s3Service.deleteObject({ key: testKey });
+
+    // 7. Verify object no longer exists
+    const existsAfterDelete = await s3Service.doesObjectExist({ key: testKey });
+    expect(existsAfterDelete).toBe(false);
   });
 });
