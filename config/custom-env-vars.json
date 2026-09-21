@@ -1,5 +1,9 @@
 {
   "port": "PORT",
+  "logger": {
+    "level": "LOGGER_LEVEL",
+    "format": "LOGGER_FORMAT"
+  },
   "db": {
     "host": "DB_HOST",
     "port": "DB_PORT",
@@ -9,8 +13,23 @@
     "maxPoolSize": "DB_MAX_POOL_SIZE",
     "ssl": "DB_SSL"
   },
-  "logger": {
-    "level": "LOGGER_LEVEL",
-    "format": "LOGGER_FORMAT"
+  "s3": {
+    "endpoint": "S3_ENDPOINT",
+    "region": "S3_REGION",
+    "accessKey": "S3_ACCESS_KEY",
+    "secretKey": "S3_SECRET_KEY",
+    "publicBucket": "S3_PUBLIC_BUCKET",
+    "presignedUrlTtl": "PRESIGNED_URL_TTL",
+    "usePathStyle": "S3_USE_PATH_STYLE"
+  },
+  "auth": {
+    "internalPublicKeyPath": "INTERNAL_PUBLIC_KEY_PATH"
+  },
+  "microServices": {
+    "msUserUrl": "MS_USER_URL",
+    "msPostUrl": "MS_POST_URL",
+    "msEventUrl": "MS_EVENT_URL",
+    "msSocialUrl": "MS_SOCIAL_URL",
+    "msWsUrl": "MS_WS_URL"
   }
 }
