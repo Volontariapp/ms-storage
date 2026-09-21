@@ -6,6 +6,7 @@ import {
   HeadObjectCommand,
   DeleteObjectCommand,
   NotFound,
+  S3ServiceException,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { AppConfigService } from '../../config/app-config.service.js';
@@ -20,6 +21,34 @@ export type {
   GeneratePresignedDownloadUrlOptions,
   S3ObjectOptions,
 };
+
+function isNotFoundError(error: unknown): boolean {
+  if (error instanceof NotFound) {
+    return true;
+  }
+  if (error instanceof S3ServiceException) {
+    return (
+      error.name === 'NotFound' ||
+      error.name === 'NoSuchKey' ||
+      error.$metadata?.httpStatusCode === 404
+    );
+  }
+  if (typeof error === 'object' && error !== null) {
+    if ('name' in error && (error.name === 'NotFound' || error.name === 'NoSuchKey')) {
+      return true;
+    }
+    if (
+      '$metadata' in error &&
+      typeof error.$metadata === 'object' &&
+      error.$metadata !== null &&
+      'httpStatusCode' in error.$metadata &&
+      error.$metadata.httpStatusCode === 404
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 @Injectable()
 export class S3Service {
@@ -94,11 +123,7 @@ export class S3Service {
       await this.client.send(command);
       return true;
     } catch (error: unknown) {
-      if (
-        error instanceof NotFound ||
-        (error as { name?: string }).name === 'NotFound' ||
-        (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404
-      ) {
+      if (isNotFoundError(error)) {
         return false;
       }
       throw error;
