@@ -11,20 +11,15 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { AppConfigService } from '../../config/app-config.service.js';
 
 export interface GeneratePresignedUploadUrlOptions {
-  bucket?: string;
   key: string;
   contentType: string;
-  ttlSeconds?: number;
 }
 
 export interface GeneratePresignedDownloadUrlOptions {
-  bucket?: string;
   key: string;
-  ttlSeconds?: number;
 }
 
 export interface S3ObjectOptions {
-  bucket?: string;
   key: string;
 }
 
@@ -58,8 +53,8 @@ export class S3Service {
    * d'uploader directement un fichier sur S3/MinIO.
    */
   async generatePresignedUploadUrl(options: GeneratePresignedUploadUrlOptions): Promise<string> {
-    const bucket = options.bucket ?? this.appConfig.s3.publicBucket;
-    const ttlSeconds = options.ttlSeconds ?? this.appConfig.s3.presignedUrlTtl;
+    const bucket = this.appConfig.s3.publicBucket;
+    const ttlSeconds = this.appConfig.s3.presignedUrlTtl;
 
     const command = new PutObjectCommand({
       Bucket: bucket,
@@ -76,8 +71,8 @@ export class S3Service {
   async generatePresignedDownloadUrl(
     options: GeneratePresignedDownloadUrlOptions,
   ): Promise<string> {
-    const bucket = options.bucket ?? this.appConfig.s3.publicBucket;
-    const ttlSeconds = options.ttlSeconds ?? this.appConfig.s3.presignedUrlTtl;
+    const bucket = this.appConfig.s3.publicBucket;
+    const ttlSeconds = this.appConfig.s3.presignedUrlTtl;
 
     const command = new GetObjectCommand({
       Bucket: bucket,
@@ -91,7 +86,7 @@ export class S3Service {
    * Vérifie l'existence d'un objet S3 via HeadObjectCommand.
    */
   async doesObjectExist(options: S3ObjectOptions): Promise<boolean> {
-    const bucket = options.bucket ?? this.appConfig.s3.publicBucket;
+    const bucket = this.appConfig.s3.publicBucket;
 
     try {
       const command = new HeadObjectCommand({
@@ -116,7 +111,7 @@ export class S3Service {
    * Supprime un objet S3 via DeleteObjectCommand.
    */
   async deleteObject(options: S3ObjectOptions): Promise<void> {
-    const bucket = options.bucket ?? this.appConfig.s3.publicBucket;
+    const bucket = this.appConfig.s3.publicBucket;
 
     const command = new DeleteObjectCommand({
       Bucket: bucket,
