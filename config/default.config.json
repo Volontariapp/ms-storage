@@ -1,4 +1,9 @@
 {
+  "port": 3006,
+  "logger": {
+    "level": "info",
+    "format": "text"
+  },
   "db": {
     "host": "localhost",
     "port": 5437,
@@ -8,9 +13,23 @@
     "maxPoolSize": 10,
     "ssl": false
   },
-  "logger": {
-    "level": "info",
-    "format": "text"
+  "s3": {
+    "endpoint": "http://localhost:9000",
+    "region": "us-east-1",
+    "accessKey": "minioadmin",
+    "secretKey": "minioadmin",
+    "publicBucket": "volontariapp-files",
+    "presignedUrlTtl": 900,
+    "usePathStyle": true
   },
-  "port": 3006
+  "auth": {
+    "internalPublicKeyPath": "certs/internal.pub"
+  },
+  "microServices": {
+    "msUserUrl": "localhost:5001",
+    "msPostUrl": "localhost:5002",
+    "msEventUrl": "localhost:5003",
+    "msSocialUrl": "localhost:5004",
+    "msWsUrl": "localhost:5005"
+  }
 }
