@@ -1,14 +1,16 @@
 import 'reflect-metadata';
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { S3Service } from './s3.service.js';
-import type { AppConfigService } from '../../config/app-config.service.js';
+import { S3Service } from '../../providers/s3/s3.service.js';
+import { AppConfigService } from '../../config/app-config.service.js';
+import type { CustomConfig } from '../../config/base-config.js';
 
 describe('S3Service (Unit)', () => {
   let s3Service: S3Service;
-  let mockAppConfig: AppConfigService;
+  let appConfigService: AppConfigService;
 
   beforeEach(() => {
-    mockAppConfig = {
+    const rawConfig: Partial<CustomConfig> = {
+      port: 3006,
       s3: {
         endpoint: 'http://localhost:9000',
         region: 'us-east-1',
@@ -18,9 +20,10 @@ describe('S3Service (Unit)', () => {
         presignedUrlTtl: 900,
         usePathStyle: true,
       },
-    } as unknown as AppConfigService;
+    };
 
-    s3Service = new S3Service(mockAppConfig);
+    appConfigService = new AppConfigService(rawConfig as CustomConfig);
+    s3Service = new S3Service(appConfigService);
   });
 
   it('should instantiate S3Client correctly', () => {
@@ -65,7 +68,7 @@ describe('S3Service (Unit)', () => {
 
   it('should return true if object exists', async () => {
     const sendSpy = jest.spyOn(s3Service.getClient(), 'send').mockImplementation(async () => {
-      return {} as any;
+      return { $metadata: { httpStatusCode: 200 } };
     });
 
     const exists = await s3Service.doesObjectExist({ key: 'existing.jpg' });
@@ -76,7 +79,7 @@ describe('S3Service (Unit)', () => {
 
   it('should call deleteObject on client', async () => {
     const sendSpy = jest.spyOn(s3Service.getClient(), 'send').mockImplementation(async () => {
-      return {} as any;
+      return { $metadata: { httpStatusCode: 204 } };
     });
 
     await s3Service.deleteObject({ key: 'delete-me.jpg' });

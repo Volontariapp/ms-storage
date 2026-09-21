@@ -1,8 +1,9 @@
 import 'reflect-metadata';
 import { describe, it, expect, beforeAll } from '@jest/globals';
 import { CreateBucketCommand } from '@aws-sdk/client-s3';
-import { S3Service } from './s3.service.js';
-import type { AppConfigService } from '../../config/app-config.service.js';
+import { S3Service } from '../../providers/s3/s3.service.js';
+import { AppConfigService } from '../../config/app-config.service.js';
+import type { CustomConfig } from '../../config/base-config.js';
 
 describe('S3Service MinIO E2E Lifecycle (Integration)', () => {
   let s3Service: S3Service;
@@ -13,7 +14,8 @@ describe('S3Service MinIO E2E Lifecycle (Integration)', () => {
   const contentType = 'text/plain';
 
   beforeAll(async () => {
-    const mockAppConfig = {
+    const rawConfig: Partial<CustomConfig> = {
+      port: 3006,
       s3: {
         endpoint: process.env.S3_ENDPOINT ?? 'http://127.0.0.1:9000',
         region: 'us-east-1',
@@ -23,9 +25,10 @@ describe('S3Service MinIO E2E Lifecycle (Integration)', () => {
         presignedUrlTtl: 900,
         usePathStyle: true,
       },
-    } as unknown as AppConfigService;
+    };
 
-    s3Service = new S3Service(mockAppConfig);
+    const appConfigService = new AppConfigService(rawConfig as CustomConfig);
+    s3Service = new S3Service(appConfigService);
 
     try {
       const client = s3Service.getClient();
