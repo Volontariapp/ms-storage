@@ -17,6 +17,6 @@ describe('LoadConfig Integration Test', () => {
     expect(typeof config.port).toBe('number');
     expect(config.s3).toBeDefined();
     expect(config.s3.endpoint).toBe('http://localhost:9000');
-    expect(config.s3.publicBucket).toBe('volontariapp-files');
+    expect(config.s3.publicBucket).toBe('volontariapp-public');
   });
 });

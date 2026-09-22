@@ -18,7 +18,7 @@ describe('S3Service (Unit)', () => {
         region: 'us-east-1',
         accessKey: 'minioadmin',
         secretKey: 'minioadmin',
-        publicBucket: 'volontariapp-files',
+        publicBucket: 'volontariapp-public',
         presignedUrlTtl: 900,
         usePathStyle: true,
       },
@@ -41,7 +41,7 @@ describe('S3Service (Unit)', () => {
 
     expect(url).toBeDefined();
     expect(typeof url).toBe('string');
-    expect(url).toContain('http://localhost:9000/volontariapp-files/avatars/user-1.jpg');
+    expect(url).toContain('http://localhost:9000/volontariapp-public/avatars/user-1.jpg');
     expect(url).toContain('X-Amz-Signature');
   });
 
@@ -52,7 +52,7 @@ describe('S3Service (Unit)', () => {
 
     expect(url).toBeDefined();
     expect(typeof url).toBe('string');
-    expect(url).toContain('http://localhost:9000/volontariapp-files/avatars/user-1.jpg');
+    expect(url).toContain('http://localhost:9000/volontariapp-public/avatars/user-1.jpg');
   });
 
   it('should return false if object does not exist (NotFound error)', async () => {

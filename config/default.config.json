@@ -18,7 +18,7 @@
     "region": "us-east-1",
     "accessKey": "minioadmin",
     "secretKey": "minioadmin",
-    "publicBucket": "volontariapp-files",
+    "publicBucket": "volontariapp-public",
     "presignedUrlTtl": 900,
     "usePathStyle": true
   },
