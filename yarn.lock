@@ -4948,6 +4948,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@volontariapp/domain-storage@npm:^0.3.0":
+  version: 0.3.0
+  resolution: "@volontariapp/domain-storage@npm:0.3.0"
+  dependencies:
+    "@volontariapp/errors": "npm:0.6.2"
+  checksum: 10c0/823e79cbaea5d3ed2f8254bad093e18cb40d0197f128c071ba3e390eaa11cb4ac9f838f4a81662cad286999f78861678ec78b51cd7a9b355c6911cc240f59d9b
+  languageName: node
+  linkType: hard
+
 "@volontariapp/errors-nest@npm:0.13.2, @volontariapp/errors-nest@npm:^0.13.0":
   version: 0.13.2
   resolution: "@volontariapp/errors-nest@npm:0.13.2"
@@ -9957,6 +9966,7 @@ __metadata:
     "@volontariapp/bridge-nest": "npm:^0.3.15"
     "@volontariapp/config": "npm:^3.2.0"
     "@volontariapp/database": "npm:^3.3.18"
+    "@volontariapp/domain-storage": "npm:^0.3.0"
     "@volontariapp/errors-nest": "npm:^0.13.0"
     "@volontariapp/eslint-config": "npm:^2.2.4"
     "@volontariapp/health-check-nest": "npm:^0.1.35"

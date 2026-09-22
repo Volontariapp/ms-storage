@@ -14,7 +14,7 @@ import type {
   GeneratePresignedUploadUrlOptions,
   GeneratePresignedDownloadUrlOptions,
   S3ObjectOptions,
-} from './interfaces/index.js';
+} from '@volontariapp/domain-storage';
 
 export type {
   GeneratePresignedUploadUrlOptions,

@@ -51,6 +51,7 @@
     "@volontariapp/bridge-nest": "^0.3.15",
     "@volontariapp/config": "^3.2.0",
     "@volontariapp/database": "^3.3.18",
+    "@volontariapp/domain-storage": "^0.3.0",
     "@volontariapp/errors-nest": "^0.13.0",
     "@volontariapp/eslint-config": "^2.2.4",
     "@volontariapp/health-check-nest": "^0.1.35",
