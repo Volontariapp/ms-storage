@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
-import { AppConfigService } from './app-config.service.js';
-import { CustomConfig } from './base-config.js';
+import { AppConfigService } from '../../../config/app-config.service.js';
+import type { CustomConfig } from '../../../config/base-config.js';
 
 describe('AppConfigService', () => {
   it('should expose s3, db, logger, port, auth, and microServices getters correctly', () => {
