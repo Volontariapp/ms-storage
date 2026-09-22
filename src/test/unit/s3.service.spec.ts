@@ -4,14 +4,16 @@ import { S3Service } from '../../providers/s3/s3.service.js';
 import { AppConfigService } from '../../config/app-config.service.js';
 import type { CustomConfig } from '../../config/base-config.js';
 
+import { createMock } from '@volontariapp/testing';
+
 describe('S3Service (Unit)', () => {
   let s3Service: S3Service;
-  let appConfigService: AppConfigService;
+  let mockAppConfig: jest.Mocked<AppConfigService>;
 
   beforeEach(() => {
-    const rawConfig: Partial<CustomConfig> = {
-      port: 3006,
-      s3: {
+    mockAppConfig = createMock<AppConfigService>();
+    Object.defineProperty(mockAppConfig, 's3', {
+      value: {
         endpoint: 'http://localhost:9000',
         region: 'us-east-1',
         accessKey: 'minioadmin',
@@ -20,10 +22,10 @@ describe('S3Service (Unit)', () => {
         presignedUrlTtl: 900,
         usePathStyle: true,
       },
-    };
+      writable: true,
+    });
 
-    appConfigService = new AppConfigService(rawConfig as CustomConfig);
-    s3Service = new S3Service(appConfigService);
+    s3Service = new S3Service(mockAppConfig);
   });
 
   it('should instantiate S3Client correctly', () => {
