@@ -1,0 +1,9 @@
+schema-version: v2.2
+dd-service: ms-storage
+team: volontariapp
+application: volontariapp
+description: Microservice gRPC de gestion du stockage de fichiers et Presigned URLs S3/MinIO.
+tier: backend
+type: web
+repos:
+  - url: https://github.com/Volontariapp/ms-storage
