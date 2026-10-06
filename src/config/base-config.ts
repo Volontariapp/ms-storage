@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import { IsDefined, IsNotEmpty, IsString, ValidateNested } from 'class-validator';
 import { BackendConfig, MSURLsConfig, PostgresConfig } from '@volontariapp/config';
 import { S3Config } from './s3-config.js';
+import { ScannerConfig } from './scanner-config.js';
 
 export class ExtendedMSURLsConfig extends MSURLsConfig {
   @IsDefined()
@@ -25,4 +26,9 @@ export class CustomConfig extends BackendConfig {
   @ValidateNested()
   @Type(() => S3Config)
   s3!: S3Config;
+
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => ScannerConfig)
+  scanner!: ScannerConfig;
 }
