@@ -17,10 +17,18 @@
     "endpoint": "http://localhost:9000",
     "region": "us-east-1",
     "accessKey": "minioadmin",
-    "secretKey": "minioadmin",
+    "secretKey": "minioadminpassword",
     "publicBucket": "volontariapp-public",
+    "privateBucket": "volontariapp-private",
+    "publicEndpoint": "http://localhost:9000",
+    "publicBaseUrl": "http://localhost:9000/volontariapp-public",
     "presignedUrlTtl": 900,
     "usePathStyle": true
+  },
+  "scanner": {
+    "host": "localhost",
+    "port": 3310,
+    "timeoutMs": 5000
   },
   "auth": {
     "internalPublicKeyPath": "certs/internal.pub"
@@ -30,6 +38,7 @@
     "msPostUrl": "localhost:5002",
     "msEventUrl": "localhost:5003",
     "msSocialUrl": "localhost:5004",
-    "msWsUrl": "localhost:5005"
+    "msWsUrl": "localhost:5005",
+    "msStorageUrl": "0.0.0.0:5006"
   }
 }

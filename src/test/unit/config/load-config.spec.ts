@@ -18,5 +18,11 @@ describe('LoadConfig Integration Test', () => {
     expect(config.s3).toBeDefined();
     expect(config.s3.endpoint).toBe('http://localhost:9000');
     expect(config.s3.publicBucket).toBe('volontariapp-public');
+    expect(config.s3.secretKey).toBe('minioadminpassword');
+    expect(config.s3.privateBucket).toBe('volontariapp-private');
+    expect(config.s3.publicEndpoint).toBe('http://localhost:9000');
+    expect(config.s3.publicBaseUrl).toBe('http://localhost:9000/volontariapp-public');
+    expect(config.scanner).toEqual({ host: 'localhost', port: 3310, timeoutMs: 5000 });
+    expect(config.microServices.msStorageUrl).toBe('0.0.0.0:5006');
   });
 });

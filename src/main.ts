@@ -9,6 +9,8 @@ import { AppModule } from './app.module.js';
 import { loadConfig } from '@volontariapp/config';
 import { CustomConfig } from './config/base-config.js';
 import { Logger } from '@volontariapp/logger';
+import { GRPC_MICROSERVICES, getGrpcOptions } from '@volontariapp/contracts-nest';
+import { AppConfigService } from './config/app-config.service.js';
 
 function resolveConfigDirectory(): string {
   const currentFileDir = dirname(fileURLToPath(import.meta.url));
@@ -31,6 +33,13 @@ async function bootstrap() {
     logger,
   });
 
+  const configService = app.get(AppConfigService);
+
+  app.connectMicroservice(
+    getGrpcOptions(GRPC_MICROSERVICES.STORAGE, configService.microServices.msStorageUrl),
+    { inheritAppConfig: true },
+  );
+
   const config = new DocumentBuilder()
     .setTitle('Storage Service')
     .setDescription('The Storage Service API description')
@@ -40,7 +49,10 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
+  await app.startAllMicroservices();
+  logger.log(`gRPC server listening on ${configService.microServices.msStorageUrl}`);
   await app.listen(appConfig.port);
+  logger.log(`HTTP server listening on port ${String(appConfig.port)}`);
 }
 void bootstrap().catch((err: unknown) => {
   console.error(err);
