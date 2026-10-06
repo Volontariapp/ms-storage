@@ -11,11 +11,15 @@ import { CreateFilesAndReleasedEntities1791300000000 } from '../../migrations/do
  * and against the TypeORM metadata of `FileModel` / `ReleasedEntityModel`.
  *
  * Opt-in: the suite runs only when MS_STORAGE_MIGRATION_TEST_DB_HOST is set (the shared CI
- * runs `yarn test` without a Postgres service). The target database is wiped, so it must be
- * a throwaway local database: `yarn test:migration` after starting one, for example
- * `docker run --rm -d -p 127.0.0.1:5437:5432 -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=ms_storage postgres:16-alpine`.
+ * runs `yarn test` without a Postgres service). The target database is wiped (DROP SCHEMA public
+ * CASCADE), so it must be a throwaway local database: its name must end with `_test`, which
+ * keeps the suite away from the development database `ms_storage` of config/local.config.json.
+ * `yarn test:migration` after starting one, for example
+ * `docker run --rm -d -p 127.0.0.1:5438:5432 -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=ms_storage_migration_test postgres:16-alpine`.
  */
 const dbHost = process.env.MS_STORAGE_MIGRATION_TEST_DB_HOST;
+const DB_NAME = process.env.MS_STORAGE_MIGRATION_TEST_DB_NAME ?? 'ms_storage_migration_test';
+const DB_PORT = Number(process.env.MS_STORAGE_MIGRATION_TEST_DB_PORT ?? 5438);
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '::1'];
 const describeWithDatabase = dbHost === undefined || dbHost === '' ? describe.skip : describe;
 
@@ -117,14 +121,19 @@ describeWithDatabase('ms-storage domain migrations (empty database)', () => {
     if (!LOCAL_HOSTS.includes(host)) {
       throw new Error(`Refusing to wipe a non local database (${host})`);
     }
+    if (!DB_NAME.endsWith('_test')) {
+      throw new Error(
+        `Refusing to wipe the database '${DB_NAME}': the name of a throwaway database must end with '_test'`,
+      );
+    }
 
     dataSource = new DataSource({
       type: 'postgres',
       host,
-      port: Number(process.env.MS_STORAGE_MIGRATION_TEST_DB_PORT ?? 5437),
+      port: DB_PORT,
       username: process.env.MS_STORAGE_MIGRATION_TEST_DB_USER ?? 'user',
       password: process.env.MS_STORAGE_MIGRATION_TEST_DB_PASSWORD ?? 'password',
-      database: process.env.MS_STORAGE_MIGRATION_TEST_DB_NAME ?? 'ms_storage',
+      database: DB_NAME,
       entities: [FileModel, ReleasedEntityModel],
       migrations: [InitialStorageSchema1776700000000, CreateFilesAndReleasedEntities1791300000000],
       synchronize: false,
