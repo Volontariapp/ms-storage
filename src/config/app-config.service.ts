@@ -7,6 +7,10 @@ export class AppConfigService {
     return this.config.s3;
   }
 
+  get scanner() {
+    return this.config.scanner;
+  }
+
   get db() {
     return this.config.db;
   }

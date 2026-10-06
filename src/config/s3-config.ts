@@ -1,4 +1,4 @@
-import { IsBoolean, IsDefined, IsNumber, IsString } from 'class-validator';
+import { IsBoolean, IsDefined, IsNotEmpty, IsNumber, IsString } from 'class-validator';
 
 export class S3Config {
   @IsDefined()
@@ -20,6 +20,23 @@ export class S3Config {
   @IsDefined()
   @IsString()
   publicBucket!: string;
+
+  @IsDefined()
+  @IsString()
+  @IsNotEmpty()
+  privateBucket!: string;
+
+  /** Endpoint joignable par le client mobile, utilise uniquement pour signer. */
+  @IsDefined()
+  @IsString()
+  @IsNotEmpty()
+  publicEndpoint!: string;
+
+  /** Base des URL publiques des fichiers (CDN ou endpoint public). */
+  @IsDefined()
+  @IsString()
+  @IsNotEmpty()
+  publicBaseUrl!: string;
 
   @IsDefined()
   @IsNumber()

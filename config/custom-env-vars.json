@@ -19,8 +19,16 @@
     "accessKey": "S3_ACCESS_KEY",
     "secretKey": "S3_SECRET_KEY",
     "publicBucket": "S3_PUBLIC_BUCKET",
+    "privateBucket": "S3_PRIVATE_BUCKET",
+    "publicEndpoint": "S3_PUBLIC_ENDPOINT",
+    "publicBaseUrl": "S3_PUBLIC_BASE_URL",
     "presignedUrlTtl": "PRESIGNED_URL_TTL",
     "usePathStyle": "S3_USE_PATH_STYLE"
+  },
+  "scanner": {
+    "host": "SCANNER_HOST",
+    "port": "SCANNER_PORT",
+    "timeoutMs": "SCANNER_TIMEOUT_MS"
   },
   "auth": {
     "internalPublicKeyPath": "INTERNAL_PUBLIC_KEY_PATH"
