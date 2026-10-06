@@ -30,6 +30,7 @@
     "msPostUrl": "localhost:5002",
     "msEventUrl": "localhost:5003",
     "msSocialUrl": "localhost:5004",
-    "msWsUrl": "localhost:5005"
+    "msWsUrl": "localhost:5005",
+    "msStorageUrl": "0.0.0.0:5006"
   }
 }

@@ -18,5 +18,6 @@ describe('LoadConfig Integration Test', () => {
     expect(config.s3).toBeDefined();
     expect(config.s3.endpoint).toBe('http://localhost:9000');
     expect(config.s3.publicBucket).toBe('volontariapp-public');
+    expect(config.microServices.msStorageUrl).toBe('0.0.0.0:5006');
   });
 });

@@ -37,6 +37,7 @@ describe('AppConfigService', () => {
         msEventUrl: 'localhost:5003',
         msSocialUrl: 'localhost:5004',
         msWsUrl: 'localhost:5005',
+        msStorageUrl: '0.0.0.0:5006',
       },
     };
 
@@ -50,5 +51,6 @@ describe('AppConfigService', () => {
     expect(service.s3.publicBucket).toBe('volontariapp-files');
     expect(service.auth.internalPublicKeyPath).toBe('certs/internal.pub');
     expect(service.microServices.msUserUrl).toBe('localhost:5001');
+    expect(service.microServices.msStorageUrl).toBe('0.0.0.0:5006');
   });
 });
