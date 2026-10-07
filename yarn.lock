@@ -5078,9 +5078,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@volontariapp/domain-storage@npm:0.9.0":
-  version: 0.9.0
-  resolution: "@volontariapp/domain-storage@npm:0.9.0"
+"@volontariapp/domain-storage@npm:0.10.0":
+  version: 0.10.0
+  resolution: "@volontariapp/domain-storage@npm:0.10.0"
   dependencies:
     "@nestjs/common": "npm:^11.0.1"
     "@volontariapp/database": "npm:3.4.24"
@@ -5096,7 +5096,7 @@ __metadata:
       optional: true
     typeorm:
       optional: true
-  checksum: 10c0/b3d0862e6c67c4ef34a59ad07f9ad1ac2563003a7bd720919f3ef1bef579228297ae25a48ab04e074c7420162d6f43422ba15d1c04a4fba46e4cfc9f0d378b85
+  checksum: 10c0/6f55ce58a78c9305fee6e0c47dd8b06f9ac51e3793a355e88c3fa162523c5f912d6d7a794e364dd619785dd832c7670c6fb9a926983cd2f9d046dab5048016fb
   languageName: node
   linkType: hard
 
@@ -10190,7 +10190,7 @@ __metadata:
     "@volontariapp/contracts": "npm:4.3.13"
     "@volontariapp/contracts-nest": "npm:3.3.5"
     "@volontariapp/database": "npm:^3.3.18"
-    "@volontariapp/domain-storage": "npm:0.9.0"
+    "@volontariapp/domain-storage": "npm:0.10.0"
     "@volontariapp/errors-nest": "npm:^0.13.0"
     "@volontariapp/eslint-config": "npm:^2.2.4"
     "@volontariapp/health-check-nest": "npm:^0.1.35"
