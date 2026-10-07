@@ -20,7 +20,7 @@ export function isNotFoundError(error: unknown): boolean {
     return (
       error.name === 'NotFound' ||
       error.name === 'NoSuchKey' ||
-      error.$metadata?.httpStatusCode === 404
+      error.$metadata.httpStatusCode === 404
     );
   }
   if (isS3LikeError(error)) {
