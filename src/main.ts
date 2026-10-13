@@ -49,6 +49,8 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
+  app.enableShutdownHooks();
+
   await app.startAllMicroservices();
   logger.log(`gRPC server listening on ${configService.microServices.msStorageUrl}`);
   await app.listen(appConfig.port);
