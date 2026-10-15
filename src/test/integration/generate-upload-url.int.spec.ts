@@ -137,7 +137,7 @@ describeWithDb('GenerateUploadUrl E2E Integration Test', () => {
       }
     }
 
-    if (dataSource && dataSource.isInitialized) {
+    if (dataSource.isInitialized) {
       await dataSource.destroy();
     }
   });

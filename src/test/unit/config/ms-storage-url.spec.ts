@@ -38,7 +38,7 @@ describe('gRPC options of ms-storage', () => {
   it('binds the STORAGE microservice on the configured url', () => {
     const options = getGrpcOptions(GRPC_MICROSERVICES.STORAGE, '0.0.0.0:5006');
 
-    expect(options.options?.url).toBe('0.0.0.0:5006');
-    expect(options.options?.package).toBeDefined();
+    expect(options.options.url).toBe('0.0.0.0:5006');
+    expect(options.options.package).toBeDefined();
   });
 });

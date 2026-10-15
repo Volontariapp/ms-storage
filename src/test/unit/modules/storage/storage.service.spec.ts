@@ -7,7 +7,6 @@ import {
   InvalidFileExtensionException,
   ValidationMode,
 } from '@volontariapp/domain-storage';
-import { BadRequestError } from '@volontariapp/errors';
 import type { PostgresFileRepository } from '@volontariapp/domain-storage/repositories';
 import type { PresignedPostSigner } from '@volontariapp/storage-pipeline';
 import { StorageService } from '../../../../modules/storage/services/storage.service.js';

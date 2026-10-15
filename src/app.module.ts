@@ -9,7 +9,6 @@ import { EntityType } from '@volontariapp/contracts-nest';
 import { AppConfigModule } from './config/app-config.module.js';
 import type { CustomConfig } from './config/base-config.js';
 import { DatabaseModule } from './providers/database/database.module.js';
-import { S3Module } from './providers/s3/s3.module.js';
 import { StorageModule } from './modules/storage/storage.module.js';
 
 @Module({
@@ -22,7 +21,6 @@ export class AppModule {
       imports: [
         AppConfigModule.forRoot(config),
         DatabaseModule.forRoot(config.db),
-        S3Module,
         StorageModule,
         AuthModule.registerMicroservice(config.auth),
         TerminusModule.forRoot({}),

@@ -157,9 +157,9 @@ describeWithDatabase('ms-storage domain migrations (empty database)', () => {
 
     expect(Object.keys(columns).sort()).toEqual(Object.keys(FILES_COLUMNS).sort());
     for (const [name, expected] of Object.entries(FILES_COLUMNS)) {
-      expect(columns[name]?.data_type).toBe(expected.type);
-      expect(columns[name]?.is_nullable === 'YES').toBe(expected.nullable);
-      expect(columns[name]?.column_default).toBe(expected.default);
+      expect(columns[name].data_type).toBe(expected.type);
+      expect(columns[name].is_nullable === 'YES').toBe(expected.nullable);
+      expect(columns[name].column_default).toBe(expected.default);
     }
   });
 
@@ -168,9 +168,9 @@ describeWithDatabase('ms-storage domain migrations (empty database)', () => {
 
     expect(Object.keys(columns).sort()).toEqual(Object.keys(RELEASED_ENTITIES_COLUMNS).sort());
     for (const [name, expected] of Object.entries(RELEASED_ENTITIES_COLUMNS)) {
-      expect(columns[name]?.data_type).toBe(expected.type);
-      expect(columns[name]?.is_nullable === 'YES').toBe(expected.nullable);
-      expect(columns[name]?.column_default).toBe(expected.default);
+      expect(columns[name].data_type).toBe(expected.type);
+      expect(columns[name].is_nullable === 'YES').toBe(expected.nullable);
+      expect(columns[name].column_default).toBe(expected.default);
     }
   });
 
@@ -181,11 +181,11 @@ describeWithDatabase('ms-storage domain migrations (empty database)', () => {
     expect(indexes.filter((row) => row.indexdef.includes(' WHERE '))).toHaveLength(5);
     for (const row of indexes) {
       const expected = FILES_INDEXES[row.indexname];
-      expect(row.indexdef).toContain(`USING btree ${expected?.columns ?? ''}`);
-      if (expected?.where === null) {
+      expect(row.indexdef).toContain(`USING btree ${expected.columns}`);
+      if (expected.where === null) {
         expect(row.indexdef).not.toContain(' WHERE ');
       } else {
-        expect(row.indexdef).toContain(`WHERE (${expected?.where ?? ''})`);
+        expect(row.indexdef).toContain(`WHERE (${expected.where})`);
       }
     }
   });

@@ -24,6 +24,6 @@ export default tseslint.config(
   },
   prettierConfig,
   {
-    ignores: ['dist/**', 'node_modules/**', 'eslint.config.mjs', '**/*.spec.ts', 'jest.*'],
+    ignores: ['dist/**', 'node_modules/**', 'eslint.config.mjs', 'jest.*'],
   },
 );
