@@ -18,7 +18,10 @@ import type { CustomConfig } from '../../config/base-config.js';
 import { StorageService } from '../../modules/storage/services/storage.service.js';
 import { GenerateUploadUrlCommandDTO } from '../../modules/storage/dto/request/command/generate-upload-url.command.dto.js';
 
-describe('GenerateUploadUrl E2E Integration Test', () => {
+const dbHost = process.env.MS_STORAGE_TEST_DB_HOST;
+const describeWithDb = dbHost ? describe : describe.skip;
+
+describeWithDb('GenerateUploadUrl E2E Integration Test', () => {
   let dataSource: DataSource;
   let fileRepository: PostgresFileRepository;
   let presignedPostSigner: PresignedPostSigner;
