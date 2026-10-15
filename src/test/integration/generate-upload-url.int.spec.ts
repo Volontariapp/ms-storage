@@ -8,9 +8,14 @@ import {
   CreateBucketCommand,
 } from '@aws-sdk/client-s3';
 import { EntityType as GrpcEntityType } from '@volontariapp/contracts-nest';
-import { FileModel, ReleasedEntityModel } from '@volontariapp/domain-storage/models';
-import { FileStatus, ScanStatus, ValidationMode } from '@volontariapp/domain-storage';
-import { PostgresFileRepository } from '@volontariapp/domain-storage/repositories';
+import {
+  FileModel,
+  FileStatus,
+  PostgresFileRepository,
+  ReleasedEntityModel,
+  ScanStatus,
+  ValidationMode,
+} from '@volontariapp/domain-storage';
 import { PresignedPostSigner } from '@volontariapp/storage-pipeline';
 import { EventQueueModel, JobsOutboxModel, JobAuditModel } from '@volontariapp/database';
 import { AppConfigService } from '../../config/app-config.service.js';

@@ -9,10 +9,11 @@ import {
 } from '@volontariapp/domain-storage';
 import type { PresignedPostResult } from '@volontariapp/storage-pipeline';
 import { GenerateUploadUrlCommandDTO } from '../../../../modules/storage/dto/request/command/generate-upload-url.command.dto.js';
+import { ConfirmFileAttachmentCommandDTO } from '../../../../modules/storage/dto/request/command/confirm-file-attachment.command.dto.js';
 
 export function createTestAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
   return {
-    id: '11111111-1111-1111-1111-111111111111',
+    id: '11111111-1111-4111-a111-111111111111',
     email: 'test@volontariapp.com',
     role: 'USER',
     permissions: [],
@@ -32,10 +33,21 @@ export function createTestGenerateUploadUrlCommand(
   return dto;
 }
 
+export function createTestConfirmFileAttachmentCommand(
+  overrides: Partial<ConfirmFileAttachmentCommandDTO> = {},
+): ConfirmFileAttachmentCommandDTO {
+  const dto = new ConfirmFileAttachmentCommandDTO();
+  dto.fileIds = ['22222222-2222-4222-a222-222222222222'];
+  dto.entityType = GrpcEntityType.ENTITY_TYPE_POST;
+  dto.entityId = '33333333-3333-4333-a333-333333333333';
+  Object.assign(dto, overrides);
+  return dto;
+}
+
 export function createTestFileEntity(overrides: Partial<FileEntity> = {}): FileEntity {
   const file = new FileEntity();
-  file.id = '22222222-2222-2222-2222-222222222222';
-  file.ownerId = '11111111-1111-1111-1111-111111111111';
+  file.id = '22222222-2222-4222-a222-222222222222';
+  file.ownerId = '11111111-1111-4111-a111-111111111111';
   file.entityType = DomainEntityType.USER_AVATAR;
   file.entityId = null;
   file.status = FileStatus.PENDING;
@@ -66,7 +78,7 @@ export function createTestPresignedPostResult(
   return {
     url: 'http://localhost:9000/volontariapp-private',
     fields: {
-      key: 'quarantine/22222222-2222-2222-2222-222222222222',
+      key: 'quarantine/22222222-2222-4222-a222-222222222222',
       'Content-Type': 'image/jpeg',
       policy: 'test-policy-base64',
       'x-amz-signature': 'test-signature',

@@ -4,7 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PostgresBridgeModule } from '@volontariapp/bridge-nest';
 import type { PostgresConfig } from '@volontariapp/config';
 import { EventQueueModel, JobsOutboxModel, JobAuditModel } from '@volontariapp/database';
-import { FileModel, ReleasedEntityModel } from '@volontariapp/domain-storage/models';
+import { FileModel, ReleasedEntityModel } from '@volontariapp/domain-storage';
 
 const entities = [FileModel, ReleasedEntityModel, JobsOutboxModel, EventQueueModel, JobAuditModel];
 

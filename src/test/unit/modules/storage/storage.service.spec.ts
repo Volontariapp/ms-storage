@@ -1,13 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { EntityType as GrpcEntityType } from '@volontariapp/contracts-nest';
 import {
+  EntityType as GrpcEntityType,
+  FileStatus as GrpcFileStatus,
+} from '@volontariapp/contracts-nest';
+import {
+  AttachmentRefusalReason,
   EntityType as DomainEntityType,
+  FileAttachmentRefusedException,
+  FileNotFoundException,
   FileSizeNotAllowedException,
+  FileStatus,
   InvalidEntityTypeException,
   InvalidFileExtensionException,
+  type PostgresFileRepository,
+  ScanStatus,
+  TooManyFilesException,
   ValidationMode,
 } from '@volontariapp/domain-storage';
-import type { PostgresFileRepository } from '@volontariapp/domain-storage/repositories';
 import type { PresignedPostSigner } from '@volontariapp/storage-pipeline';
 import { StorageService } from '../../../../modules/storage/services/storage.service.js';
 import type { AppConfigService } from '../../../../config/app-config.service.js';
@@ -17,6 +26,7 @@ import {
   createMockPresignedPostSigner,
 } from './storage.mock.js';
 import {
+  createTestConfirmFileAttachmentCommand,
   createTestFileEntity,
   createTestGenerateUploadUrlCommand,
   createTestPresignedPostResult,
@@ -29,9 +39,10 @@ describe('StorageService (Unit)', () => {
   let mockAppConfig: jest.Mocked<AppConfigService>;
 
   let createPendingSpy: jest.SpiedFunction<PostgresFileRepository['createPending']>;
+  let reserveSpy: jest.SpiedFunction<PostgresFileRepository['reserve']>;
   let presignedPostSpy: jest.SpiedFunction<PresignedPostSigner['generatePresignedPost']>;
 
-  const OWNER_ID = '11111111-1111-1111-1111-111111111111';
+  const OWNER_ID = '11111111-1111-4111-a111-111111111111';
 
   beforeEach(() => {
     mockFileRepository = createMockFileRepository();
@@ -39,6 +50,7 @@ describe('StorageService (Unit)', () => {
     mockAppConfig = createMockAppConfigService();
 
     createPendingSpy = jest.spyOn(mockFileRepository, 'createPending');
+    reserveSpy = jest.spyOn(mockFileRepository, 'reserve');
     presignedPostSpy = jest.spyOn(mockPresignedPostSigner, 'generatePresignedPost');
 
     service = new StorageService(mockFileRepository, mockPresignedPostSigner, mockAppConfig);
@@ -260,6 +272,107 @@ describe('StorageService (Unit)', () => {
       await expect(service.generateUploadUrl(OWNER_ID, command)).rejects.toThrow(
         'S3 signing failed',
       );
+    });
+  });
+
+  describe('confirmFileAttachment', () => {
+    const ENTITY_ID = '33333333-3333-4333-a333-333333333333';
+    const FILE_ID = '22222222-2222-4222-a222-222222222222';
+
+    it('should successfully reserve files for an entity and return response with metadata', async () => {
+      const command = createTestConfirmFileAttachmentCommand({
+        fileIds: [FILE_ID],
+        entityType: GrpcEntityType.ENTITY_TYPE_POST,
+        entityId: ENTITY_ID,
+      });
+
+      const reservedFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        entityType: DomainEntityType.POST,
+        entityId: ENTITY_ID,
+        status: FileStatus.RESERVED,
+        scanStatus: ScanStatus.CLEAN,
+        publicKey: `post/${FILE_ID}.webp`,
+      });
+
+      reserveSpy.mockResolvedValue([reservedFile]);
+
+      const result = await service.confirmFileAttachment(OWNER_ID, command);
+
+      expect(reserveSpy).toHaveBeenCalledTimes(1);
+      expect(reserveSpy).toHaveBeenCalledWith({
+        fileIds: [FILE_ID],
+        entityType: DomainEntityType.POST,
+        entityId: ENTITY_ID,
+        ownerId: OWNER_ID,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.updatedCount).toBe(1);
+      expect(result.files.length).toBe(1);
+      expect(result.files[0]?.id).toBe(FILE_ID);
+      expect(result.files[0]?.status).toBe(GrpcFileStatus.FILE_STATUS_RESERVED);
+      expect(result.files[0]?.publicUrl).toBe(
+        `http://localhost:9000/volontariapp-public/post/${FILE_ID}.webp`,
+      );
+    });
+
+    it('should propagate FileNotFoundException when a file is missing or belongs to another owner', async () => {
+      const command = createTestConfirmFileAttachmentCommand({
+        fileIds: [FILE_ID],
+      });
+
+      reserveSpy.mockRejectedValue(new FileNotFoundException(FILE_ID));
+
+      await expect(service.confirmFileAttachment(OWNER_ID, command)).rejects.toThrow(
+        FileNotFoundException,
+      );
+    });
+
+    it('should propagate FileAttachmentRefusedException when attachment is refused', async () => {
+      const command = createTestConfirmFileAttachmentCommand({
+        fileIds: [FILE_ID],
+        entityType: GrpcEntityType.ENTITY_TYPE_POST,
+        entityId: ENTITY_ID,
+      });
+
+      reserveSpy.mockRejectedValue(
+        new FileAttachmentRefusedException(
+          FILE_ID,
+          AttachmentRefusalReason.ENTITY_TYPE_MISMATCH,
+          DomainEntityType.POST,
+          ENTITY_ID,
+        ),
+      );
+
+      await expect(service.confirmFileAttachment(OWNER_ID, command)).rejects.toThrow(
+        FileAttachmentRefusedException,
+      );
+    });
+
+    it('should propagate TooManyFilesException when file count exceeds policy limit', async () => {
+      const command = createTestConfirmFileAttachmentCommand({
+        fileIds: [FILE_ID, '44444444-4444-4444-a444-444444444444'],
+        entityType: GrpcEntityType.ENTITY_TYPE_USER_AVATAR,
+      });
+
+      reserveSpy.mockRejectedValue(new TooManyFilesException(DomainEntityType.USER_AVATAR, 2, 1));
+
+      await expect(service.confirmFileAttachment(OWNER_ID, command)).rejects.toThrow(
+        TooManyFilesException,
+      );
+    });
+
+    it('should throw InvalidEntityTypeException for invalid entity types', async () => {
+      const command = createTestConfirmFileAttachmentCommand({
+        entityType: 999 as GrpcEntityType,
+      });
+
+      await expect(service.confirmFileAttachment(OWNER_ID, command)).rejects.toThrow(
+        InvalidEntityTypeException,
+      );
+      expect(reserveSpy).not.toHaveBeenCalled();
     });
   });
 });

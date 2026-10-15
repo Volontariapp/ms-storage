@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Logger } from '@volontariapp/logger';
-import { PostgresFileRepository } from '@volontariapp/domain-storage/repositories';
-import { getValidationPolicy } from '@volontariapp/domain-storage';
+import { getValidationPolicy, PostgresFileRepository } from '@volontariapp/domain-storage';
 import { PresignedPostSigner } from '@volontariapp/storage-pipeline';
 import { AppConfigService } from '../../../config/app-config.service.js';
 import { GenerateUploadUrlCommandDTO } from '../dto/request/command/generate-upload-url.command.dto.js';
 import { GenerateUploadUrlResponseDTO } from '../dto/response/generate-upload-url.response.dto.js';
+import { ConfirmFileAttachmentCommandDTO } from '../dto/request/command/confirm-file-attachment.command.dto.js';
+import { ConfirmFileAttachmentResponseDTO } from '../dto/response/confirm-file-attachment.response.dto.js';
 import { StorageTransformer } from '../transformers/storage.transformer.js';
 
 @Injectable()
@@ -60,5 +61,38 @@ export class StorageService {
     });
 
     return StorageTransformer.toGenerateUploadUrlResponse(file, presignedPost);
+  }
+
+  /**
+   * Synchronously confirms file attachment (reservation) before business entity is created.
+   *
+   * Validates and locks files for the entity (all-or-nothing).
+   * Calls PostgresFileRepository.reserve with ownerId from token.
+   * Returns ConfirmFileAttachmentResponseDTO with FileMetadata array and scanStatus.
+   *
+   * Invariant 5: owner_id comes from CurrentUser (INTERNAL_TOKEN), never from request payload.
+   * Invariant 6: Synchronous attachment before entity write with short deadline (2s).
+   */
+  async confirmFileAttachment(
+    ownerId: string,
+    command: ConfirmFileAttachmentCommandDTO,
+  ): Promise<ConfirmFileAttachmentResponseDTO> {
+    const domainEntityType = StorageTransformer.toDomainEntityType(command.entityType);
+
+    this.logger.info(
+      `ConfirmFileAttachment: reserving ${String(command.fileIds.length)} file(s) for owner ${ownerId}, entityType: ${domainEntityType}, entityId: ${command.entityId}`,
+    );
+
+    const files = await this.fileRepository.reserve({
+      fileIds: command.fileIds,
+      entityType: domainEntityType,
+      entityId: command.entityId,
+      ownerId,
+    });
+
+    return StorageTransformer.toConfirmFileAttachmentResponse(
+      files,
+      this.appConfig.s3.publicBaseUrl,
+    );
   }
 }

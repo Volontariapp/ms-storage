@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { DataSource } from 'typeorm';
-import { FileModel, ReleasedEntityModel } from '@volontariapp/domain-storage/models';
+import { FileModel, ReleasedEntityModel } from '@volontariapp/domain-storage';
 import { InitialStorageSchema1776700000000 } from '../../migrations/domain/1776700000000-InitialStorageSchema.js';
 import { CreateFilesAndReleasedEntities1791300000000 } from '../../migrations/domain/1791300000000-CreateFilesAndReleasedEntities.js';
 
