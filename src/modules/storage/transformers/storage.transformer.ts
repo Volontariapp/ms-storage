@@ -20,6 +20,7 @@ import {
 import type { PresignedPostResult } from '@volontariapp/storage-pipeline';
 import { GenerateUploadUrlResponseDTO } from '../dto/response/generate-upload-url.response.dto.js';
 import { ConfirmFileAttachmentResponseDTO } from '../dto/response/confirm-file-attachment.response.dto.js';
+import { ConfirmUploadResponseDTO } from '../dto/response/confirm-upload.response.dto.js';
 
 export class StorageTransformer {
   /**
@@ -196,6 +197,18 @@ export class StorageTransformer {
     response.uploadUrl = presignedPost.url;
     response.uploadFields = presignedPost.fields;
     response.expiresAt = GrpcDateMapper.toTimestamp(file.uploadExpiresAt);
+    return response;
+  }
+
+  /**
+   * Maps a FileEntity to ConfirmUploadResponseDTO.
+   */
+  static toConfirmUploadResponse(
+    file: FileEntity,
+    publicBaseUrl?: string,
+  ): ConfirmUploadResponseDTO {
+    const response = new ConfirmUploadResponseDTO();
+    response.file = this.toFileMetadata(file, publicBaseUrl);
     return response;
   }
 }

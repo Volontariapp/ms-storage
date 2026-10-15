@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import {
   EntityType as GrpcEntityType,
   FileStatus as GrpcFileStatus,
+  ScanStatus as GrpcScanStatus,
+  ValidationMode as GrpcValidationMode,
 } from '@volontariapp/contracts-nest';
 import {
   AttachmentRefusalReason,
@@ -17,16 +19,19 @@ import {
   TooManyFilesException,
   ValidationMode,
 } from '@volontariapp/domain-storage';
-import type { PresignedPostSigner } from '@volontariapp/storage-pipeline';
+import type { PresignedPostSigner, S3StorageClient } from '@volontariapp/storage-pipeline';
 import { StorageService } from '../../../../modules/storage/services/storage.service.js';
+import { UploadConfirmationFailedException } from '../../../../modules/storage/exceptions/upload-confirmation-failed.exception.js';
 import type { AppConfigService } from '../../../../config/app-config.service.js';
 import {
   createMockAppConfigService,
   createMockFileRepository,
   createMockPresignedPostSigner,
+  createMockS3StorageClient,
 } from './storage.mock.js';
 import {
   createTestConfirmFileAttachmentCommand,
+  createTestConfirmUploadCommand,
   createTestFileEntity,
   createTestGenerateUploadUrlCommand,
   createTestPresignedPostResult,
@@ -36,24 +41,38 @@ describe('StorageService (Unit)', () => {
   let service: StorageService;
   let mockFileRepository: jest.Mocked<PostgresFileRepository>;
   let mockPresignedPostSigner: jest.Mocked<PresignedPostSigner>;
+  let mockS3StorageClient: jest.Mocked<S3StorageClient>;
   let mockAppConfig: jest.Mocked<AppConfigService>;
 
   let createPendingSpy: jest.SpiedFunction<PostgresFileRepository['createPending']>;
   let reserveSpy: jest.SpiedFunction<PostgresFileRepository['reserve']>;
+  let confirmUploadSpy: jest.SpiedFunction<PostgresFileRepository['confirmUpload']>;
+  let findByIdSpy: jest.SpiedFunction<PostgresFileRepository['findById']>;
   let presignedPostSpy: jest.SpiedFunction<PresignedPostSigner['generatePresignedPost']>;
+  let headQuarantineSpy: jest.SpiedFunction<S3StorageClient['headQuarantineObject']>;
 
   const OWNER_ID = '11111111-1111-4111-a111-111111111111';
+  const FILE_ID = '22222222-2222-4222-a222-222222222222';
 
   beforeEach(() => {
     mockFileRepository = createMockFileRepository();
     mockPresignedPostSigner = createMockPresignedPostSigner();
+    mockS3StorageClient = createMockS3StorageClient();
     mockAppConfig = createMockAppConfigService();
 
     createPendingSpy = jest.spyOn(mockFileRepository, 'createPending');
     reserveSpy = jest.spyOn(mockFileRepository, 'reserve');
+    confirmUploadSpy = jest.spyOn(mockFileRepository, 'confirmUpload');
+    findByIdSpy = jest.spyOn(mockFileRepository, 'findById');
     presignedPostSpy = jest.spyOn(mockPresignedPostSigner, 'generatePresignedPost');
+    headQuarantineSpy = jest.spyOn(mockS3StorageClient, 'headQuarantineObject');
 
-    service = new StorageService(mockFileRepository, mockPresignedPostSigner, mockAppConfig);
+    service = new StorageService(
+      mockFileRepository,
+      mockPresignedPostSigner,
+      mockS3StorageClient,
+      mockAppConfig,
+    );
   });
 
   afterEach(() => {
@@ -373,6 +392,221 @@ describe('StorageService (Unit)', () => {
         InvalidEntityTypeException,
       );
       expect(reserveSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('confirmUpload', () => {
+    it('should successfully confirm an ASYNC upload and transition to SCANNING', async () => {
+      const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+      const pendingFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        scanStatus: ScanStatus.AWAITING_UPLOAD,
+        status: FileStatus.PENDING,
+        validationMode: ValidationMode.ASYNC,
+        uploadExpiresAt: new Date(Date.now() + 600000),
+      });
+
+      const updatedFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        scanStatus: ScanStatus.SCANNING,
+        status: FileStatus.PENDING,
+        validationMode: ValidationMode.ASYNC,
+        actualSize: 2048000,
+        confirmedAt: new Date(),
+      });
+
+      findByIdSpy.mockResolvedValueOnce(pendingFile).mockResolvedValueOnce(updatedFile);
+      headQuarantineSpy.mockResolvedValue({
+        size: 2048000,
+        contentType: 'image/jpeg',
+      });
+      confirmUploadSpy.mockResolvedValue({
+        id: FILE_ID,
+        validationMode: ValidationMode.ASYNC,
+      });
+
+      const response = await service.confirmUpload(OWNER_ID, command);
+
+      expect(headQuarantineSpy).toHaveBeenCalledWith(FILE_ID);
+      expect(confirmUploadSpy).toHaveBeenCalledWith({
+        fileId: FILE_ID,
+        ownerId: OWNER_ID,
+        actualSize: 2048000,
+      });
+      expect(response.file).toBeDefined();
+      expect(response.file?.id).toBe(FILE_ID);
+      expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_SCANNING);
+      expect(response.file?.validationMode).toBe(GrpcValidationMode.VALIDATION_MODE_ASYNC);
+    });
+
+    it('should return current file metadata idempotently if already SCANNING', async () => {
+      const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+      const scanningFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        scanStatus: ScanStatus.SCANNING,
+        status: FileStatus.PENDING,
+        validationMode: ValidationMode.ASYNC,
+      });
+
+      findByIdSpy.mockResolvedValue(scanningFile);
+
+      const response = await service.confirmUpload(OWNER_ID, command);
+
+      expect(headQuarantineSpy).not.toHaveBeenCalled();
+      expect(confirmUploadSpy).not.toHaveBeenCalled();
+      expect(response.file?.id).toBe(FILE_ID);
+      expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_SCANNING);
+    });
+
+    it('should return current file metadata idempotently if already CLEAN', async () => {
+      const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+      const cleanFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        scanStatus: ScanStatus.CLEAN,
+        status: FileStatus.PENDING,
+        publicKey: 'user-avatar/file-123.webp',
+      });
+
+      findByIdSpy.mockResolvedValue(cleanFile);
+
+      const response = await service.confirmUpload(OWNER_ID, command);
+
+      expect(headQuarantineSpy).not.toHaveBeenCalled();
+      expect(confirmUploadSpy).not.toHaveBeenCalled();
+      expect(response.file?.id).toBe(FILE_ID);
+      expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_CLEAN);
+    });
+
+    it('should return current file metadata idempotently if already REJECTED', async () => {
+      const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+      const rejectedFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        scanStatus: ScanStatus.REJECTED,
+        status: FileStatus.PENDING,
+      });
+
+      findByIdSpy.mockResolvedValue(rejectedFile);
+
+      const response = await service.confirmUpload(OWNER_ID, command);
+
+      expect(headQuarantineSpy).not.toHaveBeenCalled();
+      expect(confirmUploadSpy).not.toHaveBeenCalled();
+      expect(response.file?.id).toBe(FILE_ID);
+      expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_REJECTED);
+    });
+
+    it('should throw FileNotFoundException if file does not exist', async () => {
+      const command = createTestConfirmUploadCommand({ fileId: 'unknown-id' });
+      findByIdSpy.mockResolvedValue(null);
+
+      await expect(service.confirmUpload(OWNER_ID, command)).rejects.toThrow(FileNotFoundException);
+      expect(headQuarantineSpy).not.toHaveBeenCalled();
+      expect(confirmUploadSpy).not.toHaveBeenCalled();
+    });
+
+    it('should throw FileNotFoundException if ownerId does not match (security invariant)', async () => {
+      const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+      const fileOfOtherUser = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: '99999999-9999-4999-a999-999999999999',
+      });
+
+      findByIdSpy.mockResolvedValue(fileOfOtherUser);
+
+      await expect(service.confirmUpload(OWNER_ID, command)).rejects.toThrow(FileNotFoundException);
+      expect(headQuarantineSpy).not.toHaveBeenCalled();
+      expect(confirmUploadSpy).not.toHaveBeenCalled();
+    });
+
+    it('should throw UploadConfirmationFailedException if file is ORPHANED or DELETED', async () => {
+      const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+      const orphanedFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        status: FileStatus.ORPHANED,
+        scanStatus: ScanStatus.AWAITING_UPLOAD,
+      });
+
+      findByIdSpy.mockResolvedValue(orphanedFile);
+
+      await expect(service.confirmUpload(OWNER_ID, command)).rejects.toThrow(
+        UploadConfirmationFailedException,
+      );
+      expect(headQuarantineSpy).not.toHaveBeenCalled();
+    });
+
+    it('should throw UploadConfirmationFailedException if upload URL has expired', async () => {
+      const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+      const expiredFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        scanStatus: ScanStatus.AWAITING_UPLOAD,
+        status: FileStatus.PENDING,
+        uploadExpiresAt: new Date(Date.now() - 60000), // 1 minute in the past
+      });
+
+      findByIdSpy.mockResolvedValue(expiredFile);
+
+      await expect(service.confirmUpload(OWNER_ID, command)).rejects.toThrow(
+        UploadConfirmationFailedException,
+      );
+      expect(headQuarantineSpy).not.toHaveBeenCalled();
+    });
+
+    it('should throw UploadConfirmationFailedException if object is not found in quarantine S3', async () => {
+      const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+      const pendingFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        scanStatus: ScanStatus.AWAITING_UPLOAD,
+        status: FileStatus.PENDING,
+        uploadExpiresAt: new Date(Date.now() + 600000),
+      });
+
+      findByIdSpy.mockResolvedValue(pendingFile);
+      headQuarantineSpy.mockResolvedValue(null);
+
+      await expect(service.confirmUpload(OWNER_ID, command)).rejects.toThrow(
+        UploadConfirmationFailedException,
+      );
+      expect(confirmUploadSpy).not.toHaveBeenCalled();
+    });
+
+    it('should handle race condition where concurrent confirmation transitioned file during confirmUpload', async () => {
+      const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+      const pendingFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        scanStatus: ScanStatus.AWAITING_UPLOAD,
+        status: FileStatus.PENDING,
+        uploadExpiresAt: new Date(Date.now() + 600000),
+      });
+
+      const concurrentScanningFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        scanStatus: ScanStatus.SCANNING,
+        status: FileStatus.PENDING,
+      });
+
+      findByIdSpy.mockResolvedValueOnce(pendingFile).mockResolvedValueOnce(concurrentScanningFile);
+
+      headQuarantineSpy.mockResolvedValue({
+        size: 1024000,
+        contentType: 'image/jpeg',
+      });
+      // Concurrent update caused confirmUpload to return null
+      confirmUploadSpy.mockResolvedValue(null);
+
+      const response = await service.confirmUpload(OWNER_ID, command);
+
+      expect(response.file?.id).toBe(FILE_ID);
+      expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_SCANNING);
     });
   });
 });

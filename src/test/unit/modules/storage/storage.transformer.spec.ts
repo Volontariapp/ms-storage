@@ -270,4 +270,27 @@ describe('StorageTransformer (Unit)', () => {
       });
     });
   });
+
+  describe('toConfirmUploadResponse', () => {
+    it('should transform FileEntity into ConfirmUploadResponseDTO', () => {
+      const file = createTestFileEntity({
+        id: 'file-async-123',
+        scanStatus: DomainScanStatus.SCANNING,
+        status: DomainFileStatus.PENDING,
+        validationMode: DomainValidationMode.ASYNC,
+      });
+
+      const response = StorageTransformer.toConfirmUploadResponse(
+        file,
+        'http://localhost:9000/volontariapp-public',
+      );
+
+      expect(response.file).toBeDefined();
+      expect(response.file?.id).toBe('file-async-123');
+      expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_SCANNING);
+      expect(response.file?.status).toBe(GrpcFileStatus.FILE_STATUS_PENDING);
+      expect(response.file?.validationMode).toBe(GrpcValidationMode.VALIDATION_MODE_ASYNC);
+      expect(response.file?.objectKey).toBe('');
+    });
+  });
 });

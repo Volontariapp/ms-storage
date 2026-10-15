@@ -1,7 +1,7 @@
 import { createMock } from '@volontariapp/testing';
 import type { jest } from '@jest/globals';
 import type { PostgresFileRepository } from '@volontariapp/domain-storage';
-import type { PresignedPostSigner } from '@volontariapp/storage-pipeline';
+import type { PresignedPostSigner, S3StorageClient } from '@volontariapp/storage-pipeline';
 import type { AppConfigService } from '../../../../config/app-config.service.js';
 import type { StorageService } from '../../../../modules/storage/services/storage.service.js';
 
@@ -11,6 +11,10 @@ export function createMockFileRepository(): jest.Mocked<PostgresFileRepository> 
 
 export function createMockPresignedPostSigner(): jest.Mocked<PresignedPostSigner> {
   return createMock<PresignedPostSigner>();
+}
+
+export function createMockS3StorageClient(): jest.Mocked<S3StorageClient> {
+  return createMock<S3StorageClient>();
 }
 
 export function createMockStorageService(): jest.Mocked<StorageService> {

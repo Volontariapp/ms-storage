@@ -10,6 +10,7 @@ import {
 import type { PresignedPostResult } from '@volontariapp/storage-pipeline';
 import { GenerateUploadUrlCommandDTO } from '../../../../modules/storage/dto/request/command/generate-upload-url.command.dto.js';
 import { ConfirmFileAttachmentCommandDTO } from '../../../../modules/storage/dto/request/command/confirm-file-attachment.command.dto.js';
+import { ConfirmUploadCommandDTO } from '../../../../modules/storage/dto/request/command/confirm-upload.command.dto.js';
 
 export function createTestAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
   return {
@@ -29,6 +30,15 @@ export function createTestGenerateUploadUrlCommand(
   dto.sizeBytes = 500 * 1024; // 500 KB
   dto.entityType = GrpcEntityType.ENTITY_TYPE_USER_AVATAR;
   dto.isPublic = true;
+  Object.assign(dto, overrides);
+  return dto;
+}
+
+export function createTestConfirmUploadCommand(
+  overrides: Partial<ConfirmUploadCommandDTO> = {},
+): ConfirmUploadCommandDTO {
+  const dto = new ConfirmUploadCommandDTO();
+  dto.fileId = '22222222-2222-4222-a222-222222222222';
   Object.assign(dto, overrides);
   return dto;
 }
