@@ -16,7 +16,11 @@ import {
   ScanStatus,
   ValidationMode,
 } from '@volontariapp/domain-storage';
-import { PresignedPostSigner, S3StorageClient } from '@volontariapp/storage-pipeline';
+import {
+  PresignedPostSigner,
+  S3StorageClient,
+  StoragePipelineService,
+} from '@volontariapp/storage-pipeline';
 import { EventQueueModel, JobsOutboxModel, JobAuditModel } from '@volontariapp/database';
 import { AppConfigService } from '../../config/app-config.service.js';
 import type { CustomConfig } from '../../config/base-config.js';
@@ -62,6 +66,11 @@ describeWithDb('GenerateUploadUrl E2E Integration Test', () => {
           process.env.S3_PUBLIC_BASE_URL ?? `http://127.0.0.1:9000/volontariapp-public`,
         presignedUrlTtl: 900,
         usePathStyle: true,
+      },
+      scanner: {
+        host: process.env.SCANNER_HOST ?? 'localhost',
+        port: Number(process.env.SCANNER_PORT ?? 3310),
+        timeoutMs: 5000,
       },
     };
 
@@ -131,10 +140,30 @@ describeWithDb('GenerateUploadUrl E2E Integration Test', () => {
       forcePathStyle: appConfigService.s3.usePathStyle,
     });
 
+    const storagePipelineService = new StoragePipelineService({
+      s3: {
+        endpoint: appConfigService.s3.endpoint,
+        publicEndpoint: appConfigService.s3.publicEndpoint,
+        region: appConfigService.s3.region,
+        accessKeyId: appConfigService.s3.accessKey,
+        secretAccessKey: appConfigService.s3.secretKey,
+        privateBucket: appConfigService.s3.privateBucket,
+        publicBucket: appConfigService.s3.publicBucket,
+        publicBaseUrl: appConfigService.s3.publicBaseUrl,
+        forcePathStyle: appConfigService.s3.usePathStyle,
+      },
+      scanner: {
+        host: appConfigService.scanner.host,
+        port: appConfigService.scanner.port,
+        timeoutMs: appConfigService.scanner.timeoutMs,
+      },
+    });
+
     storageService = new StorageService(
       fileRepository,
       presignedPostSigner,
       s3StorageClient,
+      storagePipelineService,
       appConfigService,
     );
   });

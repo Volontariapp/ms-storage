@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from '@jest/globals';
+import { afterAll, afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { DataSource, In, type Repository } from 'typeorm';
 import {
   CreateBucketCommand,
@@ -11,6 +11,7 @@ import {
 import {
   FileStatus as GrpcFileStatus,
   ScanStatus as GrpcScanStatus,
+  ValidationMode as GrpcValidationMode,
 } from '@volontariapp/contracts-nest';
 import {
   EntityType as DomainEntityType,
@@ -23,7 +24,12 @@ import {
   ScanStatus,
   ValidationMode,
 } from '@volontariapp/domain-storage';
-import { PresignedPostSigner, S3StorageClient } from '@volontariapp/storage-pipeline';
+import {
+  PresignedPostSigner,
+  S3StorageClient,
+  StoragePipelineService,
+  ScannerTechnicalError,
+} from '@volontariapp/storage-pipeline';
 import { EventQueueModel, JobAuditModel, JobsOutboxModel } from '@volontariapp/database';
 import { AppConfigService } from '../../config/app-config.service.js';
 import type { CustomConfig } from '../../config/base-config.js';
@@ -43,12 +49,14 @@ describeWithDb('ConfirmUpload Integration Test', () => {
   let fileRepository: PostgresFileRepository;
   let presignedPostSigner: PresignedPostSigner;
   let s3StorageClient: S3StorageClient;
+  let storagePipelineService: StoragePipelineService;
   let s3Client: S3Client;
   let storageService: StorageService;
   let controller: StorageCommandController;
   let appConfigService: AppConfigService;
 
   const privateBucket = process.env.S3_PRIVATE_BUCKET ?? 'volontariapp-private';
+  const publicBucket = process.env.S3_PUBLIC_BUCKET ?? 'volontariapp-public';
   const ownerId = '11111111-1111-4111-a111-111111111111';
   const otherOwnerId = '22222222-2222-4222-a222-222222222222';
   const createdFileIds: string[] = [];
@@ -77,6 +85,11 @@ describeWithDb('ConfirmUpload Integration Test', () => {
           process.env.S3_PUBLIC_BASE_URL ?? 'http://127.0.0.1:9000/volontariapp-public',
         presignedUrlTtl: 900,
         usePathStyle: true,
+      },
+      scanner: {
+        host: process.env.SCANNER_HOST ?? 'localhost',
+        port: Number(process.env.SCANNER_PORT ?? 3310),
+        timeoutMs: 5000,
       },
     };
 
@@ -123,6 +136,21 @@ describeWithDb('ConfirmUpload Integration Test', () => {
       }
     }
 
+    try {
+      await s3Client.send(new CreateBucketCommand({ Bucket: publicBucket }));
+    } catch (err: unknown) {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'name' in err &&
+        (err.name === 'BucketAlreadyOwnedByYou' || err.name === 'BucketAlreadyExists')
+      ) {
+        // already exists
+      } else {
+        throw err;
+      }
+    }
+
     presignedPostSigner = new PresignedPostSigner({
       endpoint: appConfigService.s3.endpoint,
       publicEndpoint: appConfigService.s3.publicEndpoint,
@@ -146,22 +174,64 @@ describeWithDb('ConfirmUpload Integration Test', () => {
       forcePathStyle: appConfigService.s3.usePathStyle,
     });
 
+    storagePipelineService = new StoragePipelineService({
+      s3: {
+        endpoint: appConfigService.s3.endpoint,
+        publicEndpoint: appConfigService.s3.publicEndpoint,
+        region: appConfigService.s3.region,
+        accessKeyId: appConfigService.s3.accessKey,
+        secretAccessKey: appConfigService.s3.secretKey,
+        privateBucket: appConfigService.s3.privateBucket,
+        publicBucket: appConfigService.s3.publicBucket,
+        publicBaseUrl: appConfigService.s3.publicBaseUrl,
+        forcePathStyle: appConfigService.s3.usePathStyle,
+      },
+      scanner: {
+        host: appConfigService.scanner.host,
+        port: appConfigService.scanner.port,
+        timeoutMs: appConfigService.scanner.timeoutMs,
+      },
+    });
+
     storageService = new StorageService(
       fileRepository,
       presignedPostSigner,
       s3StorageClient,
+      storagePipelineService,
       appConfigService,
     );
     controller = new StorageCommandController(storageService);
   });
 
   afterEach(async () => {
+    jest.restoreAllMocks();
+
     for (const fileId of createdFileIds) {
       try {
         await s3Client.send(
           new DeleteObjectCommand({
             Bucket: privateBucket,
             Key: `quarantine/${fileId}`,
+          }),
+        );
+      } catch {
+        // ignore
+      }
+      try {
+        await s3Client.send(
+          new DeleteObjectCommand({
+            Bucket: publicBucket,
+            Key: `user-avatar/${fileId}.webp`,
+          }),
+        );
+      } catch {
+        // ignore
+      }
+      try {
+        await s3Client.send(
+          new DeleteObjectCommand({
+            Bucket: publicBucket,
+            Key: `post/${fileId}.webp`,
           }),
         );
       } catch {
@@ -219,12 +289,26 @@ describeWithDb('ConfirmUpload Integration Test', () => {
     return fileModelRepo.findOneByOrFail({ id });
   }
 
-  async function putQuarantineObject(fileId: string, content = 'test-file-content-bytes') {
+  function buildValidJpegBuffer(size: number): Buffer {
+    const buf = Buffer.alloc(size, 0x00);
+    buf[0] = 0xff;
+    buf[1] = 0xd8;
+    buf[2] = 0xff;
+    buf[3] = 0xe0;
+    buf[size - 2] = 0xff;
+    buf[size - 1] = 0xd9;
+    return buf;
+  }
+
+  async function putQuarantineObject(
+    fileId: string,
+    content: string | Buffer = 'test-file-content-bytes',
+  ) {
     await s3Client.send(
       new PutObjectCommand({
         Bucket: privateBucket,
         Key: `quarantine/${fileId}`,
-        Body: Buffer.from(content),
+        Body: typeof content === 'string' ? Buffer.from(content) : content,
         ContentType: 'image/jpeg',
       }),
     );
@@ -415,5 +499,161 @@ describeWithDb('ConfirmUpload Integration Test', () => {
     expect(response.file?.id).toBe(file.id);
     expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_SCANNING);
     expect(response.file?.status).toBe(GrpcFileStatus.FILE_STATUS_PENDING);
+  });
+
+  describe('SYNC validation and fallback', () => {
+    it('processes SYNC upload nominally (USER_AVATAR <= 1MB) and returns CLEAN with public_url in one request', async () => {
+      const file = await insertFile({
+        entityType: DomainEntityType.USER_AVATAR,
+        validationMode: ValidationMode.SYNC,
+        declaredSize: 1024,
+        declaredMimeType: 'image/jpeg',
+      });
+      await putQuarantineObject(file.id, buildValidJpegBuffer(1024));
+
+      const expectedPublicKey = `user-avatar/${file.id}.webp`;
+      const expectedPublicUrl = `http://127.0.0.1:9000/volontariapp-public/${expectedPublicKey}`;
+
+      jest.spyOn(storagePipelineService, 'processFile').mockResolvedValue({
+        status: 'CLEAN',
+        publicKey: expectedPublicKey,
+        publicUrl: expectedPublicUrl,
+        actualSize: 800,
+        originalSize: 1024,
+        format: 'webp',
+        mimeType: 'image/webp',
+        width: 512,
+        height: 512,
+      });
+
+      const command = new ConfirmUploadCommandDTO();
+      command.fileId = file.id;
+
+      const response = await storageService.confirmUpload(ownerId, command);
+
+      expect(response.file).toBeDefined();
+      expect(response.file?.id).toBe(file.id);
+      expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_CLEAN);
+      expect(response.file?.publicUrl).toBe(expectedPublicUrl);
+
+      // Verify DB row
+      const updated = await fileModelRepo.findOneByOrFail({ id: file.id });
+      expect(updated.scanStatus).toBe(ScanStatus.CLEAN);
+      expect(updated.publicKey).toBe(expectedPublicKey);
+      expect(updated.scannedAt).toBeInstanceOf(Date);
+
+      // Verify no job in jobs_outbox (it was processed synchronously)
+      const jobs = await jobsOutboxRepo
+        .createQueryBuilder('job')
+        .where("job.payload->>'fileId' = :fileId", { fileId: file.id })
+        .getMany();
+      expect(jobs).toHaveLength(0);
+    });
+
+    it('switches to ASYNC and returns SCANNING with job in outbox when clamd is down on POST', async () => {
+      const file = await insertFile({
+        entityType: DomainEntityType.POST,
+        validationMode: ValidationMode.SYNC,
+        declaredSize: 1024,
+        declaredMimeType: 'image/jpeg',
+      });
+      await putQuarantineObject(file.id, buildValidJpegBuffer(1024));
+
+      // ClamAV daemon is intentionally down (connection refused on port 3310)
+      const command = new ConfirmUploadCommandDTO();
+      command.fileId = file.id;
+
+      const response = await storageService.confirmUpload(ownerId, command);
+
+      expect(response.file).toBeDefined();
+      expect(response.file?.id).toBe(file.id);
+      expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_SCANNING);
+      expect(response.file?.validationMode).toBe(GrpcValidationMode.VALIDATION_MODE_ASYNC);
+
+      // Verify DB row transitioned to ASYNC
+      const updated = await fileModelRepo.findOneByOrFail({ id: file.id });
+      expect(updated.scanStatus).toBe(ScanStatus.SCANNING);
+      expect(updated.validationMode).toBe(ValidationMode.ASYNC);
+
+      // Verify 1 job storage.scan_file was created in jobs_outbox
+      const jobs = await jobsOutboxRepo
+        .createQueryBuilder('job')
+        .where("job.payload->>'fileId' = :fileId", { fileId: file.id })
+        .getMany();
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0]?.type).toBe('storage.scan_file');
+    });
+
+    it('resets to AWAITING_UPLOAD and throws 503 UNAVAILABLE when clamd is down on USER_AVATAR', async () => {
+      const file = await insertFile({
+        entityType: DomainEntityType.USER_AVATAR,
+        validationMode: ValidationMode.SYNC,
+        declaredSize: 1024,
+        declaredMimeType: 'image/jpeg',
+      });
+      await putQuarantineObject(file.id, buildValidJpegBuffer(1024));
+
+      // ClamAV daemon is intentionally down
+      const command = new ConfirmUploadCommandDTO();
+      command.fileId = file.id;
+
+      let caughtError: unknown;
+      try {
+        await storageService.confirmUpload(ownerId, command);
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBeInstanceOf(ScannerTechnicalError);
+      const scannerError = caughtError as ScannerTechnicalError;
+      expect(scannerError.statusCode).toBe(503);
+
+      // Verify DB row was reset to AWAITING_UPLOAD with extended expiration
+      const updated = await fileModelRepo.findOneByOrFail({ id: file.id });
+      expect(updated.scanStatus).toBe(ScanStatus.AWAITING_UPLOAD);
+      expect(updated.uploadExpiresAt.getTime()).toBeGreaterThan(Date.now() + 14 * 60 * 1000);
+
+      // Verify no job in jobs_outbox
+      const jobs = await jobsOutboxRepo
+        .createQueryBuilder('job')
+        .where("job.payload->>'fileId' = :fileId", { fileId: file.id })
+        .getMany();
+      expect(jobs).toHaveLength(0);
+    });
+
+    it('rejects SYNC upload when pipeline detects MALWARE, calls rejectScan and throws 422 FAILED_PRECONDITION', async () => {
+      const file = await insertFile({
+        entityType: DomainEntityType.USER_AVATAR,
+        validationMode: ValidationMode.SYNC,
+        declaredSize: 1024,
+        declaredMimeType: 'image/jpeg',
+      });
+      await putQuarantineObject(file.id, buildValidJpegBuffer(1024));
+
+      jest.spyOn(storagePipelineService, 'processFile').mockResolvedValue({
+        status: 'REJECTED',
+        rejectionReason: RejectionReason.MALWARE,
+        details: { virusName: 'Eicar-Test-Signature' },
+      });
+
+      const command = new ConfirmUploadCommandDTO();
+      command.fileId = file.id;
+
+      await expect(storageService.confirmUpload(ownerId, command)).rejects.toThrow(
+        UploadConfirmationFailedException,
+      );
+
+      // Verify DB row
+      const updated = await fileModelRepo.findOneByOrFail({ id: file.id });
+      expect(updated.scanStatus).toBe(ScanStatus.REJECTED);
+      expect(updated.rejectionReason).toBe(RejectionReason.MALWARE);
+
+      // Verify no job in jobs_outbox
+      const jobs = await jobsOutboxRepo
+        .createQueryBuilder('job')
+        .where("job.payload->>'fileId' = :fileId", { fileId: file.id })
+        .getMany();
+      expect(jobs).toHaveLength(0);
+    });
   });
 });
