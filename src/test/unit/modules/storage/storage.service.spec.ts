@@ -15,8 +15,6 @@ import {
   createMockAppConfigService,
   createMockFileRepository,
   createMockPresignedPostSigner,
-  type MockPostgresFileRepository,
-  type MockPresignedPostSigner,
 } from './storage.mock.js';
 import {
   createTestFileEntity,
@@ -26,9 +24,9 @@ import {
 
 describe('StorageService (Unit)', () => {
   let service: StorageService;
-  let mockFileRepository: MockPostgresFileRepository & Partial<PostgresFileRepository>;
-  let mockPresignedPostSigner: MockPresignedPostSigner & Partial<PresignedPostSigner>;
-  let mockAppConfig: Partial<AppConfigService>;
+  let mockFileRepository: jest.Mocked<PostgresFileRepository>;
+  let mockPresignedPostSigner: jest.Mocked<PresignedPostSigner>;
+  let mockAppConfig: jest.Mocked<AppConfigService>;
 
   const OWNER_ID = '11111111-1111-1111-1111-111111111111';
 
@@ -37,11 +35,7 @@ describe('StorageService (Unit)', () => {
     mockPresignedPostSigner = createMockPresignedPostSigner();
     mockAppConfig = createMockAppConfigService();
 
-    service = new StorageService(
-      mockFileRepository as PostgresFileRepository,
-      mockPresignedPostSigner as PresignedPostSigner,
-      mockAppConfig as AppConfigService,
-    );
+    service = new StorageService(mockFileRepository, mockPresignedPostSigner, mockAppConfig);
   });
 
   afterEach(() => {

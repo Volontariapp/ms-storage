@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { StorageCommandController } from '../../../../modules/storage/controllers/commands/storage.command.controller.js';
 import type { StorageService } from '../../../../modules/storage/services/storage.service.js';
-import { createMockStorageService, type MockStorageService } from './storage.mock.js';
+import { createMockStorageService } from './storage.mock.js';
 import { createTestAuthUser, createTestGenerateUploadUrlCommand } from './storage.factory.js';
 import { GenerateUploadUrlResponseDTO } from '../../../../modules/storage/dto/response/generate-upload-url.response.dto.js';
 
 describe('StorageCommandController (Unit)', () => {
   let controller: StorageCommandController;
-  let mockStorageService: MockStorageService & Partial<StorageService>;
+  let mockStorageService: jest.Mocked<StorageService>;
 
   beforeEach(() => {
     mockStorageService = createMockStorageService();
-    controller = new StorageCommandController(mockStorageService as StorageService);
+    controller = new StorageCommandController(mockStorageService);
   });
 
   afterEach(() => {
