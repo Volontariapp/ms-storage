@@ -6,8 +6,15 @@ import {
   getValidationPolicy,
   PostgresFileRepository,
   ScanStatus,
+  ValidationMode,
 } from '@volontariapp/domain-storage';
-import { PresignedPostSigner, S3StorageClient } from '@volontariapp/storage-pipeline';
+import {
+  PresignedPostSigner,
+  S3StorageClient,
+  StoragePipelineService,
+  ScannerTechnicalError,
+  type PipelineResult,
+} from '@volontariapp/storage-pipeline';
 import { AppConfigService } from '../../../config/app-config.service.js';
 import { GenerateUploadUrlCommandDTO } from '../dto/request/command/generate-upload-url.command.dto.js';
 import { GenerateUploadUrlResponseDTO } from '../dto/response/generate-upload-url.response.dto.js';
@@ -26,6 +33,7 @@ export class StorageService {
     private readonly fileRepository: PostgresFileRepository,
     private readonly presignedPostSigner: PresignedPostSigner,
     private readonly s3Client: S3StorageClient,
+    private readonly storagePipelineService: StoragePipelineService,
     private readonly appConfig: AppConfigService,
   ) {}
 
@@ -182,7 +190,114 @@ export class StorageService {
       throw new UploadConfirmationFailedException(fileId, 'Could not confirm upload');
     }
 
-    const updated = (await this.fileRepository.findById(file.id)) ?? file;
-    return StorageTransformer.toConfirmUploadResponse(updated, this.appConfig.s3.publicBaseUrl);
+    // If ASYNC, job is queued in outbox; return SCANNING immediately
+    if (result.validationMode === ValidationMode.ASYNC) {
+      const updated = (await this.fileRepository.findById(file.id)) ?? file;
+      return StorageTransformer.toConfirmUploadResponse(updated, this.appConfig.s3.publicBaseUrl);
+    }
+
+    // If SYNC, execute synchronous processing pipeline (magic bytes, clamd scan, Sharp re-encoding)
+    const timeoutMs = Math.min(this.appConfig.scanner.timeoutMs + 3000, 8000);
+
+    let timer: NodeJS.Timeout | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(
+          new ScannerTechnicalError(
+            `SYNC storage pipeline timed out after ${String(timeoutMs)}ms`,
+            'SCANNER_TIMEOUT',
+          ),
+        );
+      }, timeoutMs);
+    });
+
+    let pipelineResult: PipelineResult;
+    try {
+      pipelineResult = await Promise.race([
+        this.storagePipelineService.processFile({
+          fileId: file.id,
+          entityType: file.entityType,
+          declaredMimeType: file.declaredMimeType,
+          declaredSize: file.declaredSize,
+        }),
+        timeoutPromise,
+      ]);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Technical error during SYNC pipeline for file ${file.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      const policy = getValidationPolicy(file.entityType);
+      if (policy.asyncAllowed) {
+        this.logger.warn(
+          `Entity type ${file.entityType} allows ASYNC: switching file ${file.id} to ASYNC`,
+        );
+        await this.fileRepository.switchToAsync(file.id);
+        const switched = (await this.fileRepository.findById(file.id)) ?? file;
+        return StorageTransformer.toConfirmUploadResponse(
+          switched,
+          this.appConfig.s3.publicBaseUrl,
+        );
+      } else {
+        this.logger.warn(
+          `Entity type ${file.entityType} does NOT allow ASYNC: resetting file ${file.id} to AWAITING_UPLOAD`,
+        );
+        await this.fileRepository.resetToAwaitingUpload(file.id);
+        if (error instanceof ScannerTechnicalError) {
+          throw error;
+        }
+        throw new ScannerTechnicalError(
+          error instanceof Error ? error.message : 'Storage technical error',
+          'STORAGE_TECHNICAL_ERROR',
+        );
+      }
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }
+
+    if (pipelineResult.status === 'REJECTED') {
+      this.logger.warn(
+        `SYNC pipeline rejected file ${file.id}: reason ${pipelineResult.rejectionReason}`,
+      );
+      await this.fileRepository.rejectScan({
+        fileId: file.id,
+        reason: pipelineResult.rejectionReason,
+      });
+      throw new UploadConfirmationFailedException(file.id, pipelineResult.rejectionReason, {
+        rejectionReason: pipelineResult.rejectionReason,
+        ...pipelineResult.details,
+      });
+    }
+
+    // pipelineResult.status === 'CLEAN'
+    this.logger.info(
+      `SYNC pipeline succeeded for file ${file.id}, completing scan with public key ${pipelineResult.publicKey}`,
+    );
+    const transition = await this.fileRepository.completeScan({
+      fileId: file.id,
+      publicKey: pipelineResult.publicKey,
+    });
+
+    if (!transition) {
+      this.logger.warn(
+        `File ${file.id} could not be completed (orphaned or deleted), removing public object`,
+      );
+      try {
+        await this.s3Client.deletePublicObject(pipelineResult.publicKey);
+      } catch (deleteError: unknown) {
+        this.logger.warn(
+          `Failed to delete public object ${pipelineResult.publicKey}: ${deleteError instanceof Error ? deleteError.message : String(deleteError)}`,
+        );
+      }
+      const current = await this.fileRepository.findById(file.id);
+      if (!current) {
+        throw new FileNotFoundException(file.id);
+      }
+      throw new UploadConfirmationFailedException(file.id, 'File is no longer available');
+    }
+
+    const cleanFile = (await this.fileRepository.findById(file.id)) ?? file;
+    return StorageTransformer.toConfirmUploadResponse(cleanFile, this.appConfig.s3.publicBaseUrl);
   }
 }

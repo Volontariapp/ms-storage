@@ -1,7 +1,11 @@
 import { createMock } from '@volontariapp/testing';
 import type { jest } from '@jest/globals';
 import type { PostgresFileRepository } from '@volontariapp/domain-storage';
-import type { PresignedPostSigner, S3StorageClient } from '@volontariapp/storage-pipeline';
+import type {
+  PresignedPostSigner,
+  S3StorageClient,
+  StoragePipelineService,
+} from '@volontariapp/storage-pipeline';
 import type { AppConfigService } from '../../../../config/app-config.service.js';
 import type { StorageService } from '../../../../modules/storage/services/storage.service.js';
 
@@ -15,6 +19,10 @@ export function createMockPresignedPostSigner(): jest.Mocked<PresignedPostSigner
 
 export function createMockS3StorageClient(): jest.Mocked<S3StorageClient> {
   return createMock<S3StorageClient>();
+}
+
+export function createMockStoragePipelineService(): jest.Mocked<StoragePipelineService> {
+  return createMock<StoragePipelineService>();
 }
 
 export function createMockStorageService(): jest.Mocked<StorageService> {
@@ -35,6 +43,14 @@ export function createMockAppConfigService(): jest.Mocked<AppConfigService> {
       publicBaseUrl: 'http://localhost:9000/volontariapp-public',
       presignedUrlTtl: 900,
       usePathStyle: true,
+    },
+    writable: true,
+  });
+  Object.defineProperty(mock, 'scanner', {
+    value: {
+      host: 'localhost',
+      port: 3310,
+      timeoutMs: 5000,
     },
     writable: true,
   });

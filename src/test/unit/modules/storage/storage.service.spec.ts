@@ -15,11 +15,17 @@ import {
   InvalidEntityTypeException,
   InvalidFileExtensionException,
   type PostgresFileRepository,
+  RejectionReason,
   ScanStatus,
   TooManyFilesException,
   ValidationMode,
 } from '@volontariapp/domain-storage';
-import type { PresignedPostSigner, S3StorageClient } from '@volontariapp/storage-pipeline';
+import {
+  ScannerTechnicalError,
+  type PresignedPostSigner,
+  type S3StorageClient,
+  type StoragePipelineService,
+} from '@volontariapp/storage-pipeline';
 import { StorageService } from '../../../../modules/storage/services/storage.service.js';
 import { UploadConfirmationFailedException } from '../../../../modules/storage/exceptions/upload-confirmation-failed.exception.js';
 import type { AppConfigService } from '../../../../config/app-config.service.js';
@@ -28,6 +34,7 @@ import {
   createMockFileRepository,
   createMockPresignedPostSigner,
   createMockS3StorageClient,
+  createMockStoragePipelineService,
 } from './storage.mock.js';
 import {
   createTestConfirmFileAttachmentCommand,
@@ -42,14 +49,21 @@ describe('StorageService (Unit)', () => {
   let mockFileRepository: jest.Mocked<PostgresFileRepository>;
   let mockPresignedPostSigner: jest.Mocked<PresignedPostSigner>;
   let mockS3StorageClient: jest.Mocked<S3StorageClient>;
+  let mockStoragePipelineService: jest.Mocked<StoragePipelineService>;
   let mockAppConfig: jest.Mocked<AppConfigService>;
 
   let createPendingSpy: jest.SpiedFunction<PostgresFileRepository['createPending']>;
   let reserveSpy: jest.SpiedFunction<PostgresFileRepository['reserve']>;
   let confirmUploadSpy: jest.SpiedFunction<PostgresFileRepository['confirmUpload']>;
   let findByIdSpy: jest.SpiedFunction<PostgresFileRepository['findById']>;
+  let completeScanSpy: jest.SpiedFunction<PostgresFileRepository['completeScan']>;
+  let rejectScanSpy: jest.SpiedFunction<PostgresFileRepository['rejectScan']>;
+  let switchToAsyncSpy: jest.SpiedFunction<PostgresFileRepository['switchToAsync']>;
+  let resetToAwaitingUploadSpy: jest.SpiedFunction<PostgresFileRepository['resetToAwaitingUpload']>;
   let presignedPostSpy: jest.SpiedFunction<PresignedPostSigner['generatePresignedPost']>;
   let headQuarantineSpy: jest.SpiedFunction<S3StorageClient['headQuarantineObject']>;
+  let deletePublicObjectSpy: jest.SpiedFunction<S3StorageClient['deletePublicObject']>;
+  let processFileSpy: jest.SpiedFunction<StoragePipelineService['processFile']>;
 
   const OWNER_ID = '11111111-1111-4111-a111-111111111111';
   const FILE_ID = '22222222-2222-4222-a222-222222222222';
@@ -58,19 +72,27 @@ describe('StorageService (Unit)', () => {
     mockFileRepository = createMockFileRepository();
     mockPresignedPostSigner = createMockPresignedPostSigner();
     mockS3StorageClient = createMockS3StorageClient();
+    mockStoragePipelineService = createMockStoragePipelineService();
     mockAppConfig = createMockAppConfigService();
 
     createPendingSpy = jest.spyOn(mockFileRepository, 'createPending');
     reserveSpy = jest.spyOn(mockFileRepository, 'reserve');
     confirmUploadSpy = jest.spyOn(mockFileRepository, 'confirmUpload');
     findByIdSpy = jest.spyOn(mockFileRepository, 'findById');
+    completeScanSpy = jest.spyOn(mockFileRepository, 'completeScan');
+    rejectScanSpy = jest.spyOn(mockFileRepository, 'rejectScan');
+    switchToAsyncSpy = jest.spyOn(mockFileRepository, 'switchToAsync');
+    resetToAwaitingUploadSpy = jest.spyOn(mockFileRepository, 'resetToAwaitingUpload');
     presignedPostSpy = jest.spyOn(mockPresignedPostSigner, 'generatePresignedPost');
     headQuarantineSpy = jest.spyOn(mockS3StorageClient, 'headQuarantineObject');
+    deletePublicObjectSpy = jest.spyOn(mockS3StorageClient, 'deletePublicObject');
+    processFileSpy = jest.spyOn(mockStoragePipelineService, 'processFile');
 
     service = new StorageService(
       mockFileRepository,
       mockPresignedPostSigner,
       mockS3StorageClient,
+      mockStoragePipelineService,
       mockAppConfig,
     );
   });
@@ -607,6 +629,315 @@ describe('StorageService (Unit)', () => {
 
       expect(response.file?.id).toBe(FILE_ID);
       expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_SCANNING);
+    });
+
+    describe('SYNC pipeline path', () => {
+      it('should successfully validate and process a SYNC upload (USER_AVATAR <= 1MB) and return CLEAN with publicUrl', async () => {
+        const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+        const pendingFile = createTestFileEntity({
+          id: FILE_ID,
+          ownerId: OWNER_ID,
+          entityType: DomainEntityType.USER_AVATAR,
+          declaredMimeType: 'image/jpeg',
+          declaredSize: 500 * 1024,
+          scanStatus: ScanStatus.AWAITING_UPLOAD,
+          status: FileStatus.PENDING,
+          validationMode: ValidationMode.SYNC,
+          uploadExpiresAt: new Date(Date.now() + 600000),
+        });
+
+        const cleanFile = createTestFileEntity({
+          id: FILE_ID,
+          ownerId: OWNER_ID,
+          entityType: DomainEntityType.USER_AVATAR,
+          declaredMimeType: 'image/jpeg',
+          declaredSize: 500 * 1024,
+          actualSize: 500 * 1024,
+          scanStatus: ScanStatus.CLEAN,
+          status: FileStatus.PENDING,
+          validationMode: ValidationMode.SYNC,
+          publicKey: `user-avatar/${FILE_ID}.webp`,
+          scannedAt: new Date(),
+        });
+
+        findByIdSpy.mockResolvedValueOnce(pendingFile).mockResolvedValueOnce(cleanFile);
+        headQuarantineSpy.mockResolvedValue({
+          size: 500 * 1024,
+          contentType: 'image/jpeg',
+        });
+        confirmUploadSpy.mockResolvedValue({
+          id: FILE_ID,
+          validationMode: ValidationMode.SYNC,
+        });
+        processFileSpy.mockResolvedValue({
+          status: 'CLEAN',
+          publicKey: `user-avatar/${FILE_ID}.webp`,
+          publicUrl: `http://localhost:9000/volontariapp-public/user-avatar/${FILE_ID}.webp`,
+          actualSize: 450 * 1024,
+          originalSize: 500 * 1024,
+          format: 'webp',
+          mimeType: 'image/webp',
+          width: 512,
+          height: 512,
+        });
+        completeScanSpy.mockResolvedValue({
+          fileId: FILE_ID,
+          status: FileStatus.PENDING,
+          eventEmitted: false,
+        });
+
+        const response = await service.confirmUpload(OWNER_ID, command);
+
+        expect(headQuarantineSpy).toHaveBeenCalledWith(FILE_ID);
+        expect(confirmUploadSpy).toHaveBeenCalledWith({
+          fileId: FILE_ID,
+          ownerId: OWNER_ID,
+          actualSize: 500 * 1024,
+        });
+        expect(processFileSpy).toHaveBeenCalledWith({
+          fileId: FILE_ID,
+          entityType: DomainEntityType.USER_AVATAR,
+          declaredMimeType: 'image/jpeg',
+          declaredSize: 500 * 1024,
+        });
+        expect(completeScanSpy).toHaveBeenCalledWith({
+          fileId: FILE_ID,
+          publicKey: `user-avatar/${FILE_ID}.webp`,
+        });
+        expect(response.file?.id).toBe(FILE_ID);
+        expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_CLEAN);
+        expect(response.file?.publicUrl).toBe(
+          `http://localhost:9000/volontariapp-public/user-avatar/${FILE_ID}.webp`,
+        );
+      });
+
+      it('should reject SYNC upload when pipeline detects malware, call rejectScan and throw 422 FAILED_PRECONDITION', async () => {
+        const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+        const pendingFile = createTestFileEntity({
+          id: FILE_ID,
+          ownerId: OWNER_ID,
+          entityType: DomainEntityType.USER_AVATAR,
+          scanStatus: ScanStatus.AWAITING_UPLOAD,
+          status: FileStatus.PENDING,
+          validationMode: ValidationMode.SYNC,
+          declaredSize: 500 * 1024,
+          declaredMimeType: 'image/jpeg',
+          uploadExpiresAt: new Date(Date.now() + 600000),
+        });
+
+        findByIdSpy.mockResolvedValue(pendingFile);
+        headQuarantineSpy.mockResolvedValue({
+          size: 500 * 1024,
+          contentType: 'image/jpeg',
+        });
+        confirmUploadSpy.mockResolvedValue({
+          id: FILE_ID,
+          validationMode: ValidationMode.SYNC,
+        });
+        processFileSpy.mockResolvedValue({
+          status: 'REJECTED',
+          rejectionReason: RejectionReason.MALWARE,
+          details: { virusName: 'Eicar-Test-Signature' },
+        });
+        rejectScanSpy.mockResolvedValue({
+          fileId: FILE_ID,
+          status: FileStatus.PENDING,
+          eventEmitted: false,
+        });
+
+        await expect(service.confirmUpload(OWNER_ID, command)).rejects.toThrow(
+          UploadConfirmationFailedException,
+        );
+
+        expect(rejectScanSpy).toHaveBeenCalledWith({
+          fileId: FILE_ID,
+          reason: RejectionReason.MALWARE,
+        });
+        expect(completeScanSpy).not.toHaveBeenCalled();
+      });
+
+      it('should reject SYNC upload when pipeline detects MIME mismatch, call rejectScan and throw 422 FAILED_PRECONDITION', async () => {
+        const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+        const pendingFile = createTestFileEntity({
+          id: FILE_ID,
+          ownerId: OWNER_ID,
+          entityType: DomainEntityType.USER_AVATAR,
+          scanStatus: ScanStatus.AWAITING_UPLOAD,
+          status: FileStatus.PENDING,
+          validationMode: ValidationMode.SYNC,
+          declaredSize: 500 * 1024,
+          declaredMimeType: 'image/jpeg',
+          uploadExpiresAt: new Date(Date.now() + 600000),
+        });
+
+        findByIdSpy.mockResolvedValue(pendingFile);
+        headQuarantineSpy.mockResolvedValue({
+          size: 500 * 1024,
+          contentType: 'image/jpeg',
+        });
+        confirmUploadSpy.mockResolvedValue({
+          id: FILE_ID,
+          validationMode: ValidationMode.SYNC,
+        });
+        processFileSpy.mockResolvedValue({
+          status: 'REJECTED',
+          rejectionReason: RejectionReason.MIME_MISMATCH,
+          details: { declaredMimeType: 'image/jpeg' },
+        });
+        rejectScanSpy.mockResolvedValue({
+          fileId: FILE_ID,
+          status: FileStatus.PENDING,
+          eventEmitted: false,
+        });
+
+        await expect(service.confirmUpload(OWNER_ID, command)).rejects.toThrow(
+          UploadConfirmationFailedException,
+        );
+
+        expect(rejectScanSpy).toHaveBeenCalledWith({
+          fileId: FILE_ID,
+          reason: RejectionReason.MIME_MISMATCH,
+        });
+      });
+
+      it('should switch to ASYNC on technical error when entity allows ASYNC (POST) and return SCANNING', async () => {
+        const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+        const pendingFile = createTestFileEntity({
+          id: FILE_ID,
+          ownerId: OWNER_ID,
+          entityType: DomainEntityType.POST,
+          scanStatus: ScanStatus.AWAITING_UPLOAD,
+          status: FileStatus.PENDING,
+          validationMode: ValidationMode.SYNC,
+          declaredSize: 500 * 1024,
+          declaredMimeType: 'image/jpeg',
+          uploadExpiresAt: new Date(Date.now() + 600000),
+        });
+
+        const switchedFile = createTestFileEntity({
+          id: FILE_ID,
+          ownerId: OWNER_ID,
+          entityType: DomainEntityType.POST,
+          scanStatus: ScanStatus.SCANNING,
+          status: FileStatus.PENDING,
+          validationMode: ValidationMode.ASYNC,
+          declaredSize: 500 * 1024,
+          actualSize: 500 * 1024,
+        });
+
+        findByIdSpy.mockResolvedValueOnce(pendingFile).mockResolvedValueOnce(switchedFile);
+        headQuarantineSpy.mockResolvedValue({
+          size: 500 * 1024,
+          contentType: 'image/jpeg',
+        });
+        confirmUploadSpy.mockResolvedValue({
+          id: FILE_ID,
+          validationMode: ValidationMode.SYNC,
+        });
+        processFileSpy.mockRejectedValue(
+          new ScannerTechnicalError('ClamAV daemon unreachable', 'SCANNER_CONNECTION_ERROR'),
+        );
+        switchToAsyncSpy.mockResolvedValue(true);
+
+        const response = await service.confirmUpload(OWNER_ID, command);
+
+        expect(switchToAsyncSpy).toHaveBeenCalledWith(FILE_ID);
+        expect(resetToAwaitingUploadSpy).not.toHaveBeenCalled();
+        expect(response.file?.id).toBe(FILE_ID);
+        expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_SCANNING);
+        expect(response.file?.validationMode).toBe(GrpcValidationMode.VALIDATION_MODE_ASYNC);
+      });
+
+      it('should reset to AWAITING_UPLOAD and throw 503 UNAVAILABLE on technical error when entity does NOT allow ASYNC (USER_AVATAR)', async () => {
+        const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+        const pendingFile = createTestFileEntity({
+          id: FILE_ID,
+          ownerId: OWNER_ID,
+          entityType: DomainEntityType.USER_AVATAR,
+          scanStatus: ScanStatus.AWAITING_UPLOAD,
+          status: FileStatus.PENDING,
+          validationMode: ValidationMode.SYNC,
+          declaredSize: 500 * 1024,
+          declaredMimeType: 'image/jpeg',
+          uploadExpiresAt: new Date(Date.now() + 600000),
+        });
+
+        findByIdSpy.mockResolvedValue(pendingFile);
+        headQuarantineSpy.mockResolvedValue({
+          size: 500 * 1024,
+          contentType: 'image/jpeg',
+        });
+        confirmUploadSpy.mockResolvedValue({
+          id: FILE_ID,
+          validationMode: ValidationMode.SYNC,
+        });
+        processFileSpy.mockRejectedValue(
+          new ScannerTechnicalError('ClamAV scan timed out', 'SCANNER_TIMEOUT'),
+        );
+        resetToAwaitingUploadSpy.mockResolvedValue(true);
+
+        await expect(service.confirmUpload(OWNER_ID, command)).rejects.toThrow(
+          ScannerTechnicalError,
+        );
+
+        expect(resetToAwaitingUploadSpy).toHaveBeenCalledWith(FILE_ID);
+        expect(switchToAsyncSpy).not.toHaveBeenCalled();
+      });
+
+      it('should delete public object and throw 422 if completeScan returns null (file orphaned or deleted in flight)', async () => {
+        const command = createTestConfirmUploadCommand({ fileId: FILE_ID });
+        const pendingFile = createTestFileEntity({
+          id: FILE_ID,
+          ownerId: OWNER_ID,
+          entityType: DomainEntityType.USER_AVATAR,
+          scanStatus: ScanStatus.AWAITING_UPLOAD,
+          status: FileStatus.PENDING,
+          validationMode: ValidationMode.SYNC,
+          declaredSize: 500 * 1024,
+          declaredMimeType: 'image/jpeg',
+          uploadExpiresAt: new Date(Date.now() + 600000),
+        });
+
+        const orphanedFile = createTestFileEntity({
+          id: FILE_ID,
+          ownerId: OWNER_ID,
+          status: FileStatus.ORPHANED,
+          scanStatus: ScanStatus.SCANNING,
+        });
+
+        findByIdSpy.mockResolvedValueOnce(pendingFile).mockResolvedValueOnce(orphanedFile);
+        headQuarantineSpy.mockResolvedValue({
+          size: 500 * 1024,
+          contentType: 'image/jpeg',
+        });
+        confirmUploadSpy.mockResolvedValue({
+          id: FILE_ID,
+          validationMode: ValidationMode.SYNC,
+        });
+        processFileSpy.mockResolvedValue({
+          status: 'CLEAN',
+          publicKey: `user-avatar/${FILE_ID}.webp`,
+          publicUrl: `http://localhost:9000/volontariapp-public/user-avatar/${FILE_ID}.webp`,
+          actualSize: 450 * 1024,
+          originalSize: 500 * 1024,
+          format: 'webp',
+          mimeType: 'image/webp',
+          width: 512,
+          height: 512,
+        });
+        completeScanSpy.mockResolvedValue(null);
+        deletePublicObjectSpy.mockResolvedValue(undefined);
+
+        await expect(service.confirmUpload(OWNER_ID, command)).rejects.toThrow(
+          UploadConfirmationFailedException,
+        );
+
+        expect(completeScanSpy).toHaveBeenCalledWith({
+          fileId: FILE_ID,
+          publicKey: `user-avatar/${FILE_ID}.webp`,
+        });
+        expect(deletePublicObjectSpy).toHaveBeenCalledWith(`user-avatar/${FILE_ID}.webp`);
+      });
     });
   });
 });
