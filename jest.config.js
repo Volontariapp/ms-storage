@@ -20,4 +20,5 @@ export default {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   setupFilesAfterEnv: ['../jest.setup.js'],
+  watchman: false,
 };

@@ -1,4 +1,6 @@
+import 'reflect-metadata';
 import { describe, it, expect } from '@jest/globals';
+import { LoggerFormat } from '@volontariapp/config';
 import { AppConfigService } from '../../../config/app-config.service.js';
 import type { CustomConfig } from '../../../config/base-config.js';
 
@@ -8,7 +10,7 @@ describe('AppConfigService', () => {
       port: 3006,
       logger: {
         level: 'info',
-        format: 'text',
+        format: LoggerFormat.TEXT,
       },
       db: {
         host: 'localhost',

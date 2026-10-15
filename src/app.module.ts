@@ -5,10 +5,11 @@ import { GrpcValidationPipe } from '@volontariapp/validation-nest';
 import { HealthModule } from '@volontariapp/health-check-nest';
 import { TerminusModule } from '@nestjs/terminus';
 import { AuthModule, GrpcInternalGuard } from '@volontariapp/auth';
+import { EntityType } from '@volontariapp/contracts-nest';
 import { AppConfigModule } from './config/app-config.module.js';
 import type { CustomConfig } from './config/base-config.js';
 import { DatabaseModule } from './providers/database/database.module.js';
-import { S3Module } from './providers/s3/s3.module.js';
+import { StorageModule } from './modules/storage/storage.module.js';
 
 @Module({
   imports: [DatabaseModule],
@@ -20,7 +21,7 @@ export class AppModule {
       imports: [
         AppConfigModule.forRoot(config),
         DatabaseModule.forRoot(config.db),
-        S3Module,
+        StorageModule,
         AuthModule.registerMicroservice(config.auth),
         TerminusModule.forRoot({}),
         HealthModule.register({
@@ -37,7 +38,9 @@ export class AppModule {
           provide: APP_PIPE,
           useFactory: (): GrpcValidationPipe =>
             new GrpcValidationPipe({
-              enumMaps: {},
+              enumMaps: {
+                entityType: EntityType,
+              },
             }),
         },
         {
