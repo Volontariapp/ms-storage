@@ -28,12 +28,18 @@ describe('StorageService (Unit)', () => {
   let mockPresignedPostSigner: jest.Mocked<PresignedPostSigner>;
   let mockAppConfig: jest.Mocked<AppConfigService>;
 
+  let createPendingSpy: jest.SpiedFunction<PostgresFileRepository['createPending']>;
+  let presignedPostSpy: jest.SpiedFunction<PresignedPostSigner['generatePresignedPost']>;
+
   const OWNER_ID = '11111111-1111-1111-1111-111111111111';
 
   beforeEach(() => {
     mockFileRepository = createMockFileRepository();
     mockPresignedPostSigner = createMockPresignedPostSigner();
     mockAppConfig = createMockAppConfigService();
+
+    createPendingSpy = jest.spyOn(mockFileRepository, 'createPending');
+    presignedPostSpy = jest.spyOn(mockPresignedPostSigner, 'generatePresignedPost');
 
     service = new StorageService(mockFileRepository, mockPresignedPostSigner, mockAppConfig);
   });
@@ -67,13 +73,13 @@ describe('StorageService (Unit)', () => {
         },
       });
 
-      mockFileRepository.createPending.mockResolvedValue(file);
-      mockPresignedPostSigner.generatePresignedPost.mockResolvedValue(presignedResult);
+      createPendingSpy.mockResolvedValue(file);
+      presignedPostSpy.mockResolvedValue(presignedResult);
 
       const result = await service.generateUploadUrl(OWNER_ID, command);
 
-      expect(mockFileRepository.createPending).toHaveBeenCalledTimes(1);
-      expect(mockFileRepository.createPending).toHaveBeenCalledWith({
+      expect(createPendingSpy).toHaveBeenCalledTimes(1);
+      expect(createPendingSpy).toHaveBeenCalledWith({
         ownerId: OWNER_ID,
         entityType: DomainEntityType.USER_AVATAR,
         declaredMimeType: 'image/jpeg',
@@ -81,8 +87,8 @@ describe('StorageService (Unit)', () => {
         presignedUrlTtlSeconds: 900,
       });
 
-      expect(mockPresignedPostSigner.generatePresignedPost).toHaveBeenCalledTimes(1);
-      expect(mockPresignedPostSigner.generatePresignedPost).toHaveBeenCalledWith({
+      expect(presignedPostSpy).toHaveBeenCalledTimes(1);
+      expect(presignedPostSpy).toHaveBeenCalledWith({
         fileId: 'file-avatar-123',
         declaredMimeType: 'image/jpeg',
         maxSizeBytes: 1024 * 1024, // USER_AVATAR maxSizeBytes
@@ -122,12 +128,12 @@ describe('StorageService (Unit)', () => {
         },
       });
 
-      mockFileRepository.createPending.mockResolvedValue(file);
-      mockPresignedPostSigner.generatePresignedPost.mockResolvedValue(presignedResult);
+      createPendingSpy.mockResolvedValue(file);
+      presignedPostSpy.mockResolvedValue(presignedResult);
 
       const result = await service.generateUploadUrl(OWNER_ID, command);
 
-      expect(mockFileRepository.createPending).toHaveBeenCalledWith({
+      expect(createPendingSpy).toHaveBeenCalledWith({
         ownerId: OWNER_ID,
         entityType: DomainEntityType.POST,
         declaredMimeType: 'image/webp',
@@ -135,7 +141,7 @@ describe('StorageService (Unit)', () => {
         presignedUrlTtlSeconds: 900,
       });
 
-      expect(mockPresignedPostSigner.generatePresignedPost).toHaveBeenCalledWith({
+      expect(presignedPostSpy).toHaveBeenCalledWith({
         fileId: 'file-post-456',
         declaredMimeType: 'image/webp',
         maxSizeBytes: 10 * 1024 * 1024, // POST maxSizeBytes (10 MB)
@@ -153,15 +159,13 @@ describe('StorageService (Unit)', () => {
         sizeBytes: 2 * 1024 * 1024,
       });
 
-      mockFileRepository.createPending.mockResolvedValue(
+      createPendingSpy.mockResolvedValue(
         createTestFileEntity({ id: 'file-event', entityType: DomainEntityType.EVENT_COVER }),
       );
-      mockPresignedPostSigner.generatePresignedPost.mockResolvedValue(
-        createTestPresignedPostResult(),
-      );
+      presignedPostSpy.mockResolvedValue(createTestPresignedPostResult());
 
       await service.generateUploadUrl(OWNER_ID, eventCommand);
-      expect(mockFileRepository.createPending).toHaveBeenCalledWith(
+      expect(createPendingSpy).toHaveBeenCalledWith(
         expect.objectContaining({ entityType: DomainEntityType.EVENT_COVER }),
       );
 
@@ -171,12 +175,12 @@ describe('StorageService (Unit)', () => {
         sizeBytes: 100 * 1024,
       });
 
-      mockFileRepository.createPending.mockResolvedValue(
+      createPendingSpy.mockResolvedValue(
         createTestFileEntity({ id: 'file-badge', entityType: DomainEntityType.BADGE_ICON }),
       );
 
       await service.generateUploadUrl(OWNER_ID, badgeCommand);
-      expect(mockFileRepository.createPending).toHaveBeenCalledWith(
+      expect(createPendingSpy).toHaveBeenCalledWith(
         expect.objectContaining({ entityType: DomainEntityType.BADGE_ICON }),
       );
     });
@@ -205,7 +209,7 @@ describe('StorageService (Unit)', () => {
         mimeType: 'image/svg+xml',
       });
 
-      mockFileRepository.createPending.mockImplementation(() => {
+      createPendingSpy.mockImplementation(() => {
         throw new InvalidFileExtensionException('image/svg+xml', DomainEntityType.POST);
       });
 
@@ -218,7 +222,7 @@ describe('StorageService (Unit)', () => {
         mimeType: 'application/pdf',
       });
 
-      mockFileRepository.createPending.mockImplementation(() => {
+      createPendingSpy.mockImplementation(() => {
         throw new InvalidFileExtensionException('application/pdf', DomainEntityType.USER_AVATAR);
       });
 
@@ -233,7 +237,7 @@ describe('StorageService (Unit)', () => {
         sizeBytes: 15 * 1024 * 1024, // 15 MB > 10 MB limit
       });
 
-      mockFileRepository.createPending.mockImplementation(() => {
+      createPendingSpy.mockImplementation(() => {
         throw new FileSizeNotAllowedException(
           DomainEntityType.POST,
           15 * 1024 * 1024,
@@ -250,10 +254,8 @@ describe('StorageService (Unit)', () => {
       const command = createTestGenerateUploadUrlCommand();
       const file = createTestFileEntity();
 
-      mockFileRepository.createPending.mockResolvedValue(file);
-      mockPresignedPostSigner.generatePresignedPost.mockRejectedValue(
-        new Error('S3 signing failed'),
-      );
+      createPendingSpy.mockResolvedValue(file);
+      presignedPostSpy.mockRejectedValue(new Error('S3 signing failed'));
 
       await expect(service.generateUploadUrl(OWNER_ID, command)).rejects.toThrow(
         'S3 signing failed',

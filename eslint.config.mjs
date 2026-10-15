@@ -24,12 +24,6 @@ export default tseslint.config(
   },
   prettierConfig,
   {
-    files: ['**/*.spec.ts', 'src/test/**/*.ts'],
-    rules: {
-      '@typescript-eslint/unbound-method': 'off',
-    },
-  },
-  {
     ignores: ['dist/**', 'node_modules/**', 'eslint.config.mjs', 'jest.*'],
   },
 );
