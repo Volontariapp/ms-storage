@@ -8,6 +8,8 @@ import { GenerateUploadUrlCommandDTO } from '../../dto/request/command/generate-
 import { GenerateUploadUrlResponseDTO } from '../../dto/response/generate-upload-url.response.dto.js';
 import { ConfirmFileAttachmentCommandDTO } from '../../dto/request/command/confirm-file-attachment.command.dto.js';
 import { ConfirmFileAttachmentResponseDTO } from '../../dto/response/confirm-file-attachment.response.dto.js';
+import { ConfirmUploadCommandDTO } from '../../dto/request/command/confirm-upload.command.dto.js';
+import { ConfirmUploadResponseDTO } from '../../dto/response/confirm-upload.response.dto.js';
 
 @Controller()
 export class StorageCommandController {
@@ -24,6 +26,15 @@ export class StorageCommandController {
       `gRPC GenerateUploadUrl: entity ${String(data.entityType)} by user ${user.id}`,
     );
     return this.storageService.generateUploadUrl(user.id, data);
+  }
+
+  @GrpcMethod(STORAGE_SERVICE_NAME, 'ConfirmUpload')
+  async confirmUpload(
+    @Payload() data: ConfirmUploadCommandDTO,
+    @CurrentUser() user: AuthUser,
+  ): Promise<ConfirmUploadResponseDTO> {
+    this.logger.info(`gRPC ConfirmUpload: file ${data.fileId} by user ${user.id}`);
+    return this.storageService.confirmUpload(user.id, data);
   }
 
   @GrpcMethod(STORAGE_SERVICE_NAME, 'ConfirmFileAttachment')

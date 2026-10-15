@@ -9,6 +9,8 @@ import {
 } from './storage.factory.js';
 import { GenerateUploadUrlResponseDTO } from '../../../../modules/storage/dto/response/generate-upload-url.response.dto.js';
 import type { ConfirmFileAttachmentResponseDTO } from '../../../../modules/storage/dto/response/confirm-file-attachment.response.dto.js';
+import { ConfirmUploadCommandDTO } from '../../../../modules/storage/dto/request/command/confirm-upload.command.dto.js';
+import { ConfirmUploadResponseDTO } from '../../../../modules/storage/dto/response/confirm-upload.response.dto.js';
 
 describe('StorageCommandController (Unit)', () => {
   let controller: StorageCommandController;
@@ -55,6 +57,40 @@ describe('StorageCommandController (Unit)', () => {
 
       await expect(controller.generateUploadUrl(command, user)).rejects.toThrow(
         'Storage service error',
+      );
+    });
+  });
+
+  describe('confirmUpload', () => {
+    it('should delegate to StorageService with user id and command payload', async () => {
+      const user = createTestAuthUser({ id: 'user-uuid-123' });
+      const command = new ConfirmUploadCommandDTO();
+      command.fileId = 'file-uuid-456';
+
+      const expectedResponse = new ConfirmUploadResponseDTO();
+
+      const confirmUploadSpy = jest
+        .spyOn(mockStorageService, 'confirmUpload')
+        .mockResolvedValue(expectedResponse);
+
+      const result = await controller.confirmUpload(command, user);
+
+      expect(confirmUploadSpy).toHaveBeenCalledTimes(1);
+      expect(confirmUploadSpy).toHaveBeenCalledWith('user-uuid-123', command);
+      expect(result).toBe(expectedResponse);
+    });
+
+    it('should propagate errors thrown by StorageService', async () => {
+      const user = createTestAuthUser();
+      const command = new ConfirmUploadCommandDTO();
+      command.fileId = 'file-uuid-456';
+
+      jest
+        .spyOn(mockStorageService, 'confirmUpload')
+        .mockRejectedValue(new Error('Upload confirmation failed'));
+
+      await expect(controller.confirmUpload(command, user)).rejects.toThrow(
+        'Upload confirmation failed',
       );
     });
   });

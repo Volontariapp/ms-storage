@@ -5,7 +5,11 @@ import {
   PostgresFileRepository,
   ReleasedEntityModel,
 } from '@volontariapp/domain-storage';
-import { PresignedPostSigner, type S3StorageConfig } from '@volontariapp/storage-pipeline';
+import {
+  PresignedPostSigner,
+  S3StorageClient,
+  type S3StorageConfig,
+} from '@volontariapp/storage-pipeline';
 import { AppConfigService } from '../../config/app-config.service.js';
 import { StorageCommandController } from './controllers/commands/storage.command.controller.js';
 import { StorageService } from './services/storage.service.js';
@@ -35,7 +39,26 @@ import { StorageService } from './services/storage.service.js';
         return new PresignedPostSigner(config);
       },
     },
+    {
+      provide: S3StorageClient,
+      inject: [AppConfigService],
+      useFactory: (appConfig: AppConfigService): S3StorageClient => {
+        const s3 = appConfig.s3;
+        const config: S3StorageConfig = {
+          endpoint: s3.endpoint,
+          publicEndpoint: s3.publicEndpoint,
+          region: s3.region,
+          accessKeyId: s3.accessKey,
+          secretAccessKey: s3.secretKey,
+          privateBucket: s3.privateBucket,
+          publicBucket: s3.publicBucket,
+          publicBaseUrl: s3.publicBaseUrl,
+          forcePathStyle: s3.usePathStyle,
+        };
+        return new S3StorageClient(config);
+      },
+    },
   ],
-  exports: [StorageService, PostgresFileRepository, PresignedPostSigner],
+  exports: [StorageService, PostgresFileRepository, PresignedPostSigner, S3StorageClient],
 })
 export class StorageModule {}

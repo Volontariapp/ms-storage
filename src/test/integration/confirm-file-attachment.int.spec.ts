@@ -19,7 +19,7 @@ import {
   TooManyFilesException,
   ValidationMode,
 } from '@volontariapp/domain-storage';
-import { PresignedPostSigner } from '@volontariapp/storage-pipeline';
+import { PresignedPostSigner, S3StorageClient } from '@volontariapp/storage-pipeline';
 import { EventQueueModel, JobsOutboxModel, JobAuditModel } from '@volontariapp/database';
 import { AppConfigService } from '../../config/app-config.service.js';
 import type { CustomConfig } from '../../config/base-config.js';
@@ -101,7 +101,24 @@ describeWithDb('ConfirmFileAttachment Integration Test', () => {
       forcePathStyle: appConfigService.s3.usePathStyle,
     });
 
-    storageService = new StorageService(fileRepository, presignedPostSigner, appConfigService);
+    const s3StorageClient = new S3StorageClient({
+      endpoint: appConfigService.s3.endpoint,
+      publicEndpoint: appConfigService.s3.publicEndpoint,
+      region: appConfigService.s3.region,
+      accessKeyId: appConfigService.s3.accessKey,
+      secretAccessKey: appConfigService.s3.secretKey,
+      privateBucket: appConfigService.s3.privateBucket,
+      publicBucket: appConfigService.s3.publicBucket,
+      publicBaseUrl: appConfigService.s3.publicBaseUrl,
+      forcePathStyle: appConfigService.s3.usePathStyle,
+    });
+
+    storageService = new StorageService(
+      fileRepository,
+      presignedPostSigner,
+      s3StorageClient,
+      appConfigService,
+    );
     controller = new StorageCommandController(storageService);
   });
 
