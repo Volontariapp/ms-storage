@@ -18,6 +18,7 @@ import {
   FileNotFoundException,
   FileStatus,
   PostgresFileRepository,
+  RejectionReason,
   ReleasedEntityModel,
   ScanStatus,
   ValidationMode,
@@ -315,7 +316,7 @@ describeWithDb('ConfirmUpload Integration Test', () => {
   it('returns current state idempotently when file is already REJECTED', async () => {
     const file = await insertFile({
       scanStatus: ScanStatus.REJECTED,
-      rejectionReason: 'MALWARE_DETECTED',
+      rejectionReason: RejectionReason.MALWARE,
       actualSize: 1024,
     });
 
