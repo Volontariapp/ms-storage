@@ -39,35 +39,34 @@ interface ConstraintRow {
   column_name: string;
 }
 
-const FILES_COLUMNS: Record<string, { type: string; nullable: boolean; default: string | null }> =
-  {
-    id: { type: 'uuid', nullable: false, default: null },
-    owner_id: { type: 'uuid', nullable: false, default: null },
-    entity_type: { type: 'character varying', nullable: false, default: null },
-    entity_id: { type: 'uuid', nullable: true, default: null },
-    status: { type: 'character varying', nullable: false, default: `'PENDING'::character varying` },
-    scan_status: {
-      type: 'character varying',
-      nullable: false,
-      default: `'AWAITING_UPLOAD'::character varying`,
-    },
-    rejection_reason: { type: 'character varying', nullable: true, default: null },
-    declared_mime_type: { type: 'character varying', nullable: false, default: null },
-    declared_size: { type: 'bigint', nullable: false, default: null },
-    actual_size: { type: 'bigint', nullable: true, default: null },
-    quarantine_key: { type: 'character varying', nullable: false, default: null },
-    public_key: { type: 'character varying', nullable: true, default: null },
-    scan_attempts: { type: 'integer', nullable: false, default: '0' },
-    rescan_scheduled_at: { type: 'timestamp with time zone', nullable: true, default: null },
-    validation_mode: { type: 'character varying', nullable: false, default: null },
-    upload_expires_at: { type: 'timestamp with time zone', nullable: false, default: null },
-    confirmed_at: { type: 'timestamp with time zone', nullable: true, default: null },
-    scanned_at: { type: 'timestamp with time zone', nullable: true, default: null },
-    reserved_at: { type: 'timestamp with time zone', nullable: true, default: null },
-    attached_at: { type: 'timestamp with time zone', nullable: true, default: null },
-    created_at: { type: 'timestamp with time zone', nullable: false, default: 'now()' },
-    updated_at: { type: 'timestamp with time zone', nullable: false, default: 'now()' },
-  };
+const FILES_COLUMNS: Record<string, { type: string; nullable: boolean; default: string | null }> = {
+  id: { type: 'uuid', nullable: false, default: null },
+  owner_id: { type: 'uuid', nullable: false, default: null },
+  entity_type: { type: 'character varying', nullable: false, default: null },
+  entity_id: { type: 'uuid', nullable: true, default: null },
+  status: { type: 'character varying', nullable: false, default: `'PENDING'::character varying` },
+  scan_status: {
+    type: 'character varying',
+    nullable: false,
+    default: `'AWAITING_UPLOAD'::character varying`,
+  },
+  rejection_reason: { type: 'character varying', nullable: true, default: null },
+  declared_mime_type: { type: 'character varying', nullable: false, default: null },
+  declared_size: { type: 'bigint', nullable: false, default: null },
+  actual_size: { type: 'bigint', nullable: true, default: null },
+  quarantine_key: { type: 'character varying', nullable: false, default: null },
+  public_key: { type: 'character varying', nullable: true, default: null },
+  scan_attempts: { type: 'integer', nullable: false, default: '0' },
+  rescan_scheduled_at: { type: 'timestamp with time zone', nullable: true, default: null },
+  validation_mode: { type: 'character varying', nullable: false, default: null },
+  upload_expires_at: { type: 'timestamp with time zone', nullable: false, default: null },
+  confirmed_at: { type: 'timestamp with time zone', nullable: true, default: null },
+  scanned_at: { type: 'timestamp with time zone', nullable: true, default: null },
+  reserved_at: { type: 'timestamp with time zone', nullable: true, default: null },
+  attached_at: { type: 'timestamp with time zone', nullable: true, default: null },
+  created_at: { type: 'timestamp with time zone', nullable: false, default: 'now()' },
+  updated_at: { type: 'timestamp with time zone', nullable: false, default: 'now()' },
+};
 
 const RELEASED_ENTITIES_COLUMNS: typeof FILES_COLUMNS = {
   entity_type: { type: 'character varying', nullable: false, default: null },
@@ -82,7 +81,10 @@ const FILES_INDEXES: Record<string, { columns: string; where: string | null }> =
     columns: '(upload_expires_at)',
     where: `(scan_status)::text = 'AWAITING_UPLOAD'::text`,
   },
-  idx_files_scanning: { columns: '(confirmed_at)', where: `(scan_status)::text = 'SCANNING'::text` },
+  idx_files_scanning: {
+    columns: '(confirmed_at)',
+    where: `(scan_status)::text = 'SCANNING'::text`,
+  },
   idx_files_unused: { columns: '(confirmed_at)', where: `(status)::text = 'PENDING'::text` },
   idx_files_reserved: { columns: '(reserved_at)', where: `(status)::text = 'RESERVED'::text` },
   idx_files_orphaned: { columns: '(updated_at)', where: `(status)::text = 'ORPHANED'::text` },
