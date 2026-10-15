@@ -19,7 +19,7 @@
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "node --experimental-vm-modules node_modules/.bin/jest --passWithNoTests",
     "test:migration": "MS_STORAGE_MIGRATION_TEST_DB_HOST=${MS_STORAGE_MIGRATION_TEST_DB_HOST:-localhost} node --experimental-vm-modules node_modules/.bin/jest storage-schema.migration",
-    "test:integration": "MS_STORAGE_TEST_DB_HOST=${MS_STORAGE_TEST_DB_HOST:-localhost} node --experimental-vm-modules node_modules/.bin/jest src/test/integration/generate-upload-url.int.spec.ts",
+    "test:integration": "MS_STORAGE_TEST_DB_HOST=${MS_STORAGE_TEST_DB_HOST:-localhost} node --experimental-vm-modules node_modules/.bin/jest \"src/test/integration/(?!.*migration).*int\\.spec\\.ts\"",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage --passWithNoTests",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
