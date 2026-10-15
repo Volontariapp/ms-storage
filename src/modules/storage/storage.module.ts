@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { FileModel, ReleasedEntityModel } from '@volontariapp/domain-storage/models';
-import { PostgresFileRepository } from '@volontariapp/domain-storage/repositories';
+import {
+  FileModel,
+  PostgresFileRepository,
+  ReleasedEntityModel,
+} from '@volontariapp/domain-storage';
 import { PresignedPostSigner, type S3StorageConfig } from '@volontariapp/storage-pipeline';
 import { AppConfigService } from '../../config/app-config.service.js';
 import { StorageCommandController } from './controllers/commands/storage.command.controller.js';

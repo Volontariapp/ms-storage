@@ -6,7 +6,7 @@ import { CustomConfig } from './base-config.js';
 
 import { loadConfig } from '@volontariapp/config';
 import { EventQueueModel, JobsOutboxModel, JobAuditModel } from '@volontariapp/database';
-import { FileModel, ReleasedEntityModel } from '@volontariapp/domain-storage/models';
+import { FileModel, ReleasedEntityModel } from '@volontariapp/domain-storage';
 
 function resolveConfigDirectory(): string {
   const currentFileDir = dirname(fileURLToPath(import.meta.url));

@@ -6,18 +6,19 @@ import {
   EntityType as GrpcEntityType,
   ScanStatus as GrpcScanStatus,
 } from '@volontariapp/contracts-nest';
-import { FileModel, ReleasedEntityModel } from '@volontariapp/domain-storage/models';
 import {
   AttachmentRefusalReason,
   EntityType as DomainEntityType,
   FileAttachmentRefusedException,
+  FileModel,
   FileNotFoundException,
   FileStatus,
+  PostgresFileRepository,
+  ReleasedEntityModel,
   ScanStatus,
   TooManyFilesException,
   ValidationMode,
 } from '@volontariapp/domain-storage';
-import { PostgresFileRepository } from '@volontariapp/domain-storage/repositories';
 import { PresignedPostSigner } from '@volontariapp/storage-pipeline';
 import { EventQueueModel, JobsOutboxModel, JobAuditModel } from '@volontariapp/database';
 import { AppConfigService } from '../../config/app-config.service.js';

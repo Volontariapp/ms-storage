@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Logger } from '@volontariapp/logger';
-import { PostgresFileRepository } from '@volontariapp/domain-storage/repositories';
-import { getValidationPolicy } from '@volontariapp/domain-storage';
+import { getValidationPolicy, PostgresFileRepository } from '@volontariapp/domain-storage';
 import { PresignedPostSigner } from '@volontariapp/storage-pipeline';
 import { AppConfigService } from '../../../config/app-config.service.js';
 import { GenerateUploadUrlCommandDTO } from '../dto/request/command/generate-upload-url.command.dto.js';

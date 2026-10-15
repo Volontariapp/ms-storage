@@ -5597,9 +5597,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@volontariapp/domain-storage@npm:0.11.11, @volontariapp/domain-storage@npm:^0.11.11":
-  version: 0.11.11
-  resolution: "@volontariapp/domain-storage@npm:0.11.11"
+"@volontariapp/domain-storage@npm:0.11.12":
+  version: 0.11.12
+  resolution: "@volontariapp/domain-storage@npm:0.11.12"
   dependencies:
     "@nestjs/common": "npm:^11.0.1"
     "@volontariapp/database": "npm:3.10.3"
@@ -5615,7 +5615,7 @@ __metadata:
       optional: true
     typeorm:
       optional: true
-  checksum: 10c0/12cefdd18059de99229d2821ff7bc5a30e35554e15e979972f75a0d001ea53604f88af00dbbaed82183941139fde286be0a9fd0168860309a18651f058a9d57d
+  checksum: 10c0/5e46580f4af57bae30225030cfa3458b08ae0a7c98b19c991d447d78825cbb81e39b0cca0dfba9ef48284f5aaab56fad7c332c7fe219670360a0dd5dd7dcbfb6
   languageName: node
   linkType: hard
 
@@ -5788,17 +5788,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@volontariapp/storage-pipeline@npm:^0.3.0":
-  version: 0.3.0
-  resolution: "@volontariapp/storage-pipeline@npm:0.3.0"
+"@volontariapp/storage-pipeline@npm:0.3.1":
+  version: 0.3.1
+  resolution: "@volontariapp/storage-pipeline@npm:0.3.1"
   dependencies:
     "@aws-sdk/client-s3": "npm:^3.1136.0"
     "@aws-sdk/s3-presigned-post": "npm:^3.1136.0"
-    "@volontariapp/domain-storage": "npm:0.11.11"
+    "@volontariapp/domain-storage": "npm:0.11.12"
     "@volontariapp/errors": "npm:0.6.5"
     "@volontariapp/logger": "npm:0.4.0"
     sharp: "npm:^0.33.5"
-  checksum: 10c0/4a4b16a4db806ceeca4e93541b97618f2a2a1b18a007a1780bbddb6dbd5e08bbe9b6c420b8d11904882dc8df3748172aadaa3d547a2efc1c33fe8c3cd6bf9b77
+  checksum: 10c0/ed225577cefc86c2178a91bae66934d4224e27a25d3b37fbc2454bf94957d1006c62d50d3e22b9701e4d27c980929636f5cb1f71c40bc70512a6f0d40f0a9129
   languageName: node
   linkType: hard
 
@@ -10753,13 +10753,13 @@ __metadata:
     "@volontariapp/contracts": "npm:^4.3.16"
     "@volontariapp/contracts-nest": "npm:^3.3.8"
     "@volontariapp/database": "npm:^3.10.2"
-    "@volontariapp/domain-storage": "npm:^0.11.11"
+    "@volontariapp/domain-storage": "npm:0.11.12"
     "@volontariapp/errors-nest": "npm:^0.13.5"
     "@volontariapp/eslint-config": "npm:^2.2.5"
     "@volontariapp/health-check-nest": "npm:^0.1.41"
     "@volontariapp/logger": "npm:^0.4.0"
     "@volontariapp/monitoring": "npm:^2.2.2"
-    "@volontariapp/storage-pipeline": "npm:^0.3.0"
+    "@volontariapp/storage-pipeline": "npm:0.3.1"
     "@volontariapp/testing": "npm:^1.0.3"
     "@volontariapp/validation-nest": "npm:^0.1.5"
     axios: "npm:^1.7.9"

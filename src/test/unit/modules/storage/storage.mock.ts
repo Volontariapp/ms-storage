@@ -1,6 +1,6 @@
 import { createMock } from '@volontariapp/testing';
 import type { jest } from '@jest/globals';
-import type { PostgresFileRepository } from '@volontariapp/domain-storage/repositories';
+import type { PostgresFileRepository } from '@volontariapp/domain-storage';
 import type { PresignedPostSigner } from '@volontariapp/storage-pipeline';
 import type { AppConfigService } from '../../../../config/app-config.service.js';
 import type { StorageService } from '../../../../modules/storage/services/storage.service.js';
