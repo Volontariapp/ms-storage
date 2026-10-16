@@ -293,4 +293,41 @@ describe('StorageTransformer (Unit)', () => {
       expect(response.file?.objectKey).toBe('');
     });
   });
+
+  describe('toFileMetadataResponse', () => {
+    it('should transform FileEntity into FileMetadataResponseDTO', () => {
+      const fileId = '22222222-2222-4222-a222-222222222222';
+      const file = createTestFileEntity({
+        id: fileId,
+        scanStatus: DomainScanStatus.CLEAN,
+        status: DomainFileStatus.ATTACHED,
+        publicKey: `user-avatar/${fileId}.webp`,
+        validationMode: DomainValidationMode.SYNC,
+      });
+
+      const response = StorageTransformer.toFileMetadataResponse(
+        file,
+        'http://localhost:9000/volontariapp-public',
+      );
+
+      expect(response.file).toBeDefined();
+      expect(response.file?.id).toBe(fileId);
+      expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_CLEAN);
+      expect(response.file?.status).toBe(GrpcFileStatus.FILE_STATUS_ATTACHED);
+      expect(response.file?.objectKey).toBe(`user-avatar/${fileId}.webp`);
+      expect(response.file?.publicUrl).toBe(
+        `http://localhost:9000/volontariapp-public/user-avatar/${fileId}.webp`,
+      );
+    });
+  });
+
+  describe('toDeleteFileResponse', () => {
+    it('should transform boolean into DeleteFileResponseDTO', () => {
+      const responseTrue = StorageTransformer.toDeleteFileResponse(true);
+      expect(responseTrue.success).toBe(true);
+
+      const responseFalse = StorageTransformer.toDeleteFileResponse(false);
+      expect(responseFalse.success).toBe(false);
+    });
+  });
 });

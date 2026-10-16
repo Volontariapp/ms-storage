@@ -10,6 +10,8 @@ import { ConfirmFileAttachmentCommandDTO } from '../../dto/request/command/confi
 import { ConfirmFileAttachmentResponseDTO } from '../../dto/response/confirm-file-attachment.response.dto.js';
 import { ConfirmUploadCommandDTO } from '../../dto/request/command/confirm-upload.command.dto.js';
 import { ConfirmUploadResponseDTO } from '../../dto/response/confirm-upload.response.dto.js';
+import { DeleteFileCommandDTO } from '../../dto/request/command/delete-file.command.dto.js';
+import { DeleteFileResponseDTO } from '../../dto/response/delete-file.response.dto.js';
 
 @Controller()
 export class StorageCommandController {
@@ -46,5 +48,14 @@ export class StorageCommandController {
       `gRPC ConfirmFileAttachment: entity ${String(data.entityType)} (${data.entityId}) by user ${user.id} with ${String(data.fileIds.length)} file(s)`,
     );
     return this.storageService.confirmFileAttachment(user.id, data);
+  }
+
+  @GrpcMethod(STORAGE_SERVICE_NAME, 'DeleteFile')
+  async deleteFile(
+    @Payload() data: DeleteFileCommandDTO,
+    @CurrentUser() user: AuthUser,
+  ): Promise<DeleteFileResponseDTO> {
+    this.logger.info(`gRPC DeleteFile: file ${data.fileId} by user ${user.id}`);
+    return this.storageService.deleteFile(user.id, data);
   }
 }

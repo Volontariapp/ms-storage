@@ -11,6 +11,8 @@ import type { PresignedPostResult } from '@volontariapp/storage-pipeline';
 import { GenerateUploadUrlCommandDTO } from '../../../../modules/storage/dto/request/command/generate-upload-url.command.dto.js';
 import { ConfirmFileAttachmentCommandDTO } from '../../../../modules/storage/dto/request/command/confirm-file-attachment.command.dto.js';
 import { ConfirmUploadCommandDTO } from '../../../../modules/storage/dto/request/command/confirm-upload.command.dto.js';
+import { GetFileMetadataQueryDTO } from '../../../../modules/storage/dto/request/query/get-file-metadata.query.dto.js';
+import { DeleteFileCommandDTO } from '../../../../modules/storage/dto/request/command/delete-file.command.dto.js';
 
 export function createTestAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
   return {
@@ -50,6 +52,24 @@ export function createTestConfirmFileAttachmentCommand(
   dto.fileIds = ['22222222-2222-4222-a222-222222222222'];
   dto.entityType = GrpcEntityType.ENTITY_TYPE_POST;
   dto.entityId = '33333333-3333-4333-a333-333333333333';
+  Object.assign(dto, overrides);
+  return dto;
+}
+
+export function createTestGetFileMetadataQuery(
+  overrides: Partial<GetFileMetadataQueryDTO> = {},
+): GetFileMetadataQueryDTO {
+  const dto = new GetFileMetadataQueryDTO();
+  dto.fileId = '22222222-2222-4222-a222-222222222222';
+  Object.assign(dto, overrides);
+  return dto;
+}
+
+export function createTestDeleteFileCommand(
+  overrides: Partial<DeleteFileCommandDTO> = {},
+): DeleteFileCommandDTO {
+  const dto = new DeleteFileCommandDTO();
+  dto.fileId = '22222222-2222-4222-a222-222222222222';
   Object.assign(dto, overrides);
   return dto;
 }
