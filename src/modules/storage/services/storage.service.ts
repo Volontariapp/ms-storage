@@ -22,7 +22,12 @@ import { ConfirmFileAttachmentCommandDTO } from '../dto/request/command/confirm-
 import { ConfirmFileAttachmentResponseDTO } from '../dto/response/confirm-file-attachment.response.dto.js';
 import { ConfirmUploadCommandDTO } from '../dto/request/command/confirm-upload.command.dto.js';
 import { ConfirmUploadResponseDTO } from '../dto/response/confirm-upload.response.dto.js';
+import { GetFileMetadataQueryDTO } from '../dto/request/query/get-file-metadata.query.dto.js';
+import { FileMetadataResponseDTO } from '../dto/response/file-metadata.response.dto.js';
+import { DeleteFileCommandDTO } from '../dto/request/command/delete-file.command.dto.js';
+import { DeleteFileResponseDTO } from '../dto/response/delete-file.response.dto.js';
 import { UploadConfirmationFailedException } from '../exceptions/upload-confirmation-failed.exception.js';
+import { FileDeletionNotAllowedException } from '../exceptions/file-deletion-not-allowed.exception.js';
 import { StorageTransformer } from '../transformers/storage.transformer.js';
 
 @Injectable()
@@ -299,5 +304,90 @@ export class StorageService {
 
     const cleanFile = (await this.fileRepository.findById(file.id)) ?? file;
     return StorageTransformer.toConfirmUploadResponse(cleanFile, this.appConfig.s3.publicBaseUrl);
+  }
+
+  /**
+   * Retrieves file metadata for the caller.
+   *
+   * Invariant 2: Never exposes quarantine_key to callers (empty string if not clean).
+   * Invariant 5: owner_id comes from CurrentUser (INTERNAL_TOKEN), never from request payload.
+   *
+   * Throws FileNotFoundException if file does not exist, belongs to another owner,
+   * or has been marked as DELETED (404/NOT_FOUND).
+   */
+  async getFileMetadata(
+    ownerId: string,
+    query: GetFileMetadataQueryDTO,
+  ): Promise<FileMetadataResponseDTO> {
+    const fileId = query.fileId;
+    this.logger.info(`GetFileMetadata: retrieving file ${fileId} for owner ${ownerId}`);
+
+    const file = await this.fileRepository.findById(fileId);
+    if (!file || file.ownerId !== ownerId || file.status === FileStatus.DELETED) {
+      throw new FileNotFoundException(fileId);
+    }
+
+    return StorageTransformer.toFileMetadataResponse(file, this.appConfig.s3.publicBaseUrl);
+  }
+
+  /**
+   * Deletes a pending file upload for the caller (abandoned upload).
+   *
+   * Invariant: Only PENDING files belonging to the caller can be deleted directly.
+   * Reserved or attached files are released exclusively via lifecycle events.
+   * Invariant 5: owner_id comes from CurrentUser (INTERNAL_TOKEN), never from request payload.
+   *
+   * Throws FileNotFoundException if file does not exist or owner mismatch (404/NOT_FOUND).
+   * Throws FileDeletionNotAllowedException if file status is not PENDING (422/FAILED_PRECONDITION).
+   * Returns idempotent success if file is already DELETED.
+   */
+  async deleteFile(ownerId: string, command: DeleteFileCommandDTO): Promise<DeleteFileResponseDTO> {
+    const fileId = command.fileId;
+    this.logger.info(`DeleteFile: deleting file ${fileId} for owner ${ownerId}`);
+
+    const file = await this.fileRepository.findById(fileId);
+    if (!file || file.ownerId !== ownerId) {
+      throw new FileNotFoundException(fileId);
+    }
+
+    // Idempotent retry: already DELETED
+    if (file.status === FileStatus.DELETED) {
+      this.logger.info(
+        `DeleteFile: file ${fileId} is already DELETED, returning idempotent success`,
+      );
+      return StorageTransformer.toDeleteFileResponse(true);
+    }
+
+    if (file.status !== FileStatus.PENDING) {
+      throw new FileDeletionNotAllowedException(fileId, file.status);
+    }
+
+    // 1. Delete quarantine object from S3 if present (best-effort)
+    try {
+      await this.s3Client.deleteQuarantineObject(fileId);
+    } catch (error: unknown) {
+      this.logger.warn(
+        `DeleteFile: failed to delete quarantine object for file ${fileId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // 2. Delete public object if clean/public object exists (best-effort)
+    if (file.publicKey) {
+      try {
+        await this.s3Client.deletePublicObject(file.publicKey);
+      } catch (error: unknown) {
+        this.logger.warn(
+          `DeleteFile: failed to delete public object for file ${fileId} (${file.publicKey}): ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    // 3. Update status in database to DELETED
+    await this.fileRepository.updateWhere(
+      { id: fileId, ownerId, status: FileStatus.PENDING },
+      { status: FileStatus.DELETED },
+    );
+
+    return StorageTransformer.toDeleteFileResponse(true);
   }
 }

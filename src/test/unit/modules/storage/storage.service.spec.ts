@@ -28,6 +28,7 @@ import {
 } from '@volontariapp/storage-pipeline';
 import { StorageService } from '../../../../modules/storage/services/storage.service.js';
 import { UploadConfirmationFailedException } from '../../../../modules/storage/exceptions/upload-confirmation-failed.exception.js';
+import { FileDeletionNotAllowedException } from '../../../../modules/storage/exceptions/file-deletion-not-allowed.exception.js';
 import type { AppConfigService } from '../../../../config/app-config.service.js';
 import {
   createMockAppConfigService,
@@ -42,6 +43,8 @@ import {
   createTestFileEntity,
   createTestGenerateUploadUrlCommand,
   createTestPresignedPostResult,
+  createTestGetFileMetadataQuery,
+  createTestDeleteFileCommand,
 } from './storage.factory.js';
 
 describe('StorageService (Unit)', () => {
@@ -63,6 +66,8 @@ describe('StorageService (Unit)', () => {
   let presignedPostSpy: jest.SpiedFunction<PresignedPostSigner['generatePresignedPost']>;
   let headQuarantineSpy: jest.SpiedFunction<S3StorageClient['headQuarantineObject']>;
   let deletePublicObjectSpy: jest.SpiedFunction<S3StorageClient['deletePublicObject']>;
+  let deleteQuarantineObjectSpy: jest.SpiedFunction<S3StorageClient['deleteQuarantineObject']>;
+  let updateWhereSpy: jest.SpiedFunction<PostgresFileRepository['updateWhere']>;
   let processFileSpy: jest.SpiedFunction<StoragePipelineService['processFile']>;
 
   const OWNER_ID = '11111111-1111-4111-a111-111111111111';
@@ -86,6 +91,8 @@ describe('StorageService (Unit)', () => {
     presignedPostSpy = jest.spyOn(mockPresignedPostSigner, 'generatePresignedPost');
     headQuarantineSpy = jest.spyOn(mockS3StorageClient, 'headQuarantineObject');
     deletePublicObjectSpy = jest.spyOn(mockS3StorageClient, 'deletePublicObject');
+    deleteQuarantineObjectSpy = jest.spyOn(mockS3StorageClient, 'deleteQuarantineObject');
+    updateWhereSpy = jest.spyOn(mockFileRepository, 'updateWhere');
     processFileSpy = jest.spyOn(mockStoragePipelineService, 'processFile');
 
     service = new StorageService(
@@ -938,6 +945,241 @@ describe('StorageService (Unit)', () => {
         });
         expect(deletePublicObjectSpy).toHaveBeenCalledWith(`user-avatar/${FILE_ID}.webp`);
       });
+    });
+  });
+
+  describe('getFileMetadata', () => {
+    it('should return file metadata for the caller when file exists', async () => {
+      const query = createTestGetFileMetadataQuery({ fileId: FILE_ID });
+      const file = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        status: FileStatus.PENDING,
+        scanStatus: ScanStatus.AWAITING_UPLOAD,
+        quarantineKey: `quarantine/${FILE_ID}`,
+        publicKey: null,
+      });
+
+      findByIdSpy.mockResolvedValue(file);
+
+      const response = await service.getFileMetadata(OWNER_ID, query);
+
+      expect(findByIdSpy).toHaveBeenCalledWith(FILE_ID);
+      expect(response.file).toBeDefined();
+      expect(response.file?.id).toBe(FILE_ID);
+      expect(response.file?.ownerId).toBe(OWNER_ID);
+      expect(response.file?.status).toBe(GrpcFileStatus.FILE_STATUS_PENDING);
+      expect(response.file?.scanStatus).toBe(GrpcScanStatus.SCAN_STATUS_AWAITING_UPLOAD);
+      // Invariant: quarantineKey is never exposed, objectKey is empty
+      expect(response.file?.objectKey).toBe('');
+      expect(response.file?.publicUrl).toBeUndefined();
+    });
+
+    it('should return publicUrl and objectKey when file is CLEAN', async () => {
+      const query = createTestGetFileMetadataQuery({ fileId: FILE_ID });
+      const file = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        status: FileStatus.ATTACHED,
+        scanStatus: ScanStatus.CLEAN,
+        publicKey: `user-avatar/${FILE_ID}.webp`,
+        entityType: DomainEntityType.USER_AVATAR,
+      });
+
+      findByIdSpy.mockResolvedValue(file);
+
+      const response = await service.getFileMetadata(OWNER_ID, query);
+
+      expect(response.file?.objectKey).toBe(`user-avatar/${FILE_ID}.webp`);
+      expect(response.file?.publicUrl).toBe(
+        `http://localhost:9000/volontariapp-public/user-avatar/${FILE_ID}.webp`,
+      );
+    });
+
+    it('should throw FileNotFoundException if file does not exist', async () => {
+      const query = createTestGetFileMetadataQuery({ fileId: FILE_ID });
+      findByIdSpy.mockResolvedValue(null);
+
+      await expect(service.getFileMetadata(OWNER_ID, query)).rejects.toThrow(FileNotFoundException);
+    });
+
+    it('should throw FileNotFoundException if file belongs to another owner (zero info leak)', async () => {
+      const query = createTestGetFileMetadataQuery({ fileId: FILE_ID });
+      const otherUserFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: 'different-owner-uuid',
+      });
+      findByIdSpy.mockResolvedValue(otherUserFile);
+
+      await expect(service.getFileMetadata(OWNER_ID, query)).rejects.toThrow(FileNotFoundException);
+    });
+
+    it('should throw FileNotFoundException if file status is DELETED', async () => {
+      const query = createTestGetFileMetadataQuery({ fileId: FILE_ID });
+      const deletedFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        status: FileStatus.DELETED,
+      });
+      findByIdSpy.mockResolvedValue(deletedFile);
+
+      await expect(service.getFileMetadata(OWNER_ID, query)).rejects.toThrow(FileNotFoundException);
+    });
+  });
+
+  describe('deleteFile', () => {
+    it('should delete a PENDING file and delete quarantine object', async () => {
+      const command = createTestDeleteFileCommand({ fileId: FILE_ID });
+      const pendingFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        status: FileStatus.PENDING,
+        scanStatus: ScanStatus.AWAITING_UPLOAD,
+        quarantineKey: `quarantine/${FILE_ID}`,
+        publicKey: null,
+      });
+
+      findByIdSpy.mockResolvedValue(pendingFile);
+      deleteQuarantineObjectSpy.mockResolvedValue(undefined);
+      updateWhereSpy.mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] });
+
+      const response = await service.deleteFile(OWNER_ID, command);
+
+      expect(findByIdSpy).toHaveBeenCalledWith(FILE_ID);
+      expect(deleteQuarantineObjectSpy).toHaveBeenCalledWith(FILE_ID);
+      expect(deletePublicObjectSpy).not.toHaveBeenCalled();
+      expect(updateWhereSpy).toHaveBeenCalledWith(
+        { id: FILE_ID, ownerId: OWNER_ID, status: FileStatus.PENDING },
+        { status: FileStatus.DELETED },
+      );
+      expect(response.success).toBe(true);
+    });
+
+    it('should also delete public object if publicKey is present on a PENDING clean file', async () => {
+      const command = createTestDeleteFileCommand({ fileId: FILE_ID });
+      const pendingCleanFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        status: FileStatus.PENDING,
+        scanStatus: ScanStatus.CLEAN,
+        publicKey: `user-avatars/${FILE_ID}.webp`,
+      });
+
+      findByIdSpy.mockResolvedValue(pendingCleanFile);
+      deleteQuarantineObjectSpy.mockResolvedValue(undefined);
+      deletePublicObjectSpy.mockResolvedValue(undefined);
+      updateWhereSpy.mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] });
+
+      const response = await service.deleteFile(OWNER_ID, command);
+
+      expect(deleteQuarantineObjectSpy).toHaveBeenCalledWith(FILE_ID);
+      expect(deletePublicObjectSpy).toHaveBeenCalledWith(`user-avatars/${FILE_ID}.webp`);
+      expect(updateWhereSpy).toHaveBeenCalledWith(
+        { id: FILE_ID, ownerId: OWNER_ID, status: FileStatus.PENDING },
+        { status: FileStatus.DELETED },
+      );
+      expect(response.success).toBe(true);
+    });
+
+    it('should return idempotent success if file is already DELETED', async () => {
+      const command = createTestDeleteFileCommand({ fileId: FILE_ID });
+      const deletedFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        status: FileStatus.DELETED,
+      });
+
+      findByIdSpy.mockResolvedValue(deletedFile);
+
+      const response = await service.deleteFile(OWNER_ID, command);
+
+      expect(response.success).toBe(true);
+      expect(deleteQuarantineObjectSpy).not.toHaveBeenCalled();
+      expect(updateWhereSpy).not.toHaveBeenCalled();
+    });
+
+    it('should throw FileNotFoundException if file does not exist', async () => {
+      const command = createTestDeleteFileCommand({ fileId: FILE_ID });
+      findByIdSpy.mockResolvedValue(null);
+
+      await expect(service.deleteFile(OWNER_ID, command)).rejects.toThrow(FileNotFoundException);
+    });
+
+    it('should throw FileNotFoundException if file belongs to another owner (zero info leak)', async () => {
+      const command = createTestDeleteFileCommand({ fileId: FILE_ID });
+      const otherUserFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: 'other-user-uuid',
+        status: FileStatus.PENDING,
+      });
+      findByIdSpy.mockResolvedValue(otherUserFile);
+
+      await expect(service.deleteFile(OWNER_ID, command)).rejects.toThrow(FileNotFoundException);
+    });
+
+    it('should throw FileDeletionNotAllowedException if file status is ATTACHED', async () => {
+      const command = createTestDeleteFileCommand({ fileId: FILE_ID });
+      const attachedFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        status: FileStatus.ATTACHED,
+      });
+      findByIdSpy.mockResolvedValue(attachedFile);
+
+      await expect(service.deleteFile(OWNER_ID, command)).rejects.toThrow(
+        FileDeletionNotAllowedException,
+      );
+    });
+
+    it('should throw FileDeletionNotAllowedException if file status is RESERVED', async () => {
+      const command = createTestDeleteFileCommand({ fileId: FILE_ID });
+      const reservedFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        status: FileStatus.RESERVED,
+      });
+      findByIdSpy.mockResolvedValue(reservedFile);
+
+      await expect(service.deleteFile(OWNER_ID, command)).rejects.toThrow(
+        FileDeletionNotAllowedException,
+      );
+    });
+
+    it('should throw FileDeletionNotAllowedException if file status is ORPHANED', async () => {
+      const command = createTestDeleteFileCommand({ fileId: FILE_ID });
+      const orphanedFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        status: FileStatus.ORPHANED,
+      });
+      findByIdSpy.mockResolvedValue(orphanedFile);
+
+      await expect(service.deleteFile(OWNER_ID, command)).rejects.toThrow(
+        FileDeletionNotAllowedException,
+      );
+    });
+
+    it('should continue and update DB even if S3 deleteQuarantineObject throws an error', async () => {
+      const command = createTestDeleteFileCommand({ fileId: FILE_ID });
+      const pendingFile = createTestFileEntity({
+        id: FILE_ID,
+        ownerId: OWNER_ID,
+        status: FileStatus.PENDING,
+        scanStatus: ScanStatus.AWAITING_UPLOAD,
+      });
+
+      findByIdSpy.mockResolvedValue(pendingFile);
+      deleteQuarantineObjectSpy.mockRejectedValue(new Error('S3 connection glitch'));
+      updateWhereSpy.mockResolvedValue({ affected: 1, raw: [], generatedMaps: [] });
+
+      const response = await service.deleteFile(OWNER_ID, command);
+
+      expect(deleteQuarantineObjectSpy).toHaveBeenCalledWith(FILE_ID);
+      expect(updateWhereSpy).toHaveBeenCalledWith(
+        { id: FILE_ID, ownerId: OWNER_ID, status: FileStatus.PENDING },
+        { status: FileStatus.DELETED },
+      );
+      expect(response.success).toBe(true);
     });
   });
 });

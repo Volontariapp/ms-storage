@@ -14,11 +14,12 @@ import {
 } from '@volontariapp/storage-pipeline';
 import { AppConfigService } from '../../config/app-config.service.js';
 import { StorageCommandController } from './controllers/commands/storage.command.controller.js';
+import { StorageQueryController } from './controllers/queries/storage.query.controller.js';
 import { StorageService } from './services/storage.service.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([FileModel, ReleasedEntityModel])],
-  controllers: [StorageCommandController],
+  controllers: [StorageCommandController, StorageQueryController],
   providers: [
     PostgresFileRepository,
     StorageService,

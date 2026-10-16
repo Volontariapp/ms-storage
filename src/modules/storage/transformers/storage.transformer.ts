@@ -21,6 +21,8 @@ import type { PresignedPostResult } from '@volontariapp/storage-pipeline';
 import { GenerateUploadUrlResponseDTO } from '../dto/response/generate-upload-url.response.dto.js';
 import { ConfirmFileAttachmentResponseDTO } from '../dto/response/confirm-file-attachment.response.dto.js';
 import { ConfirmUploadResponseDTO } from '../dto/response/confirm-upload.response.dto.js';
+import { FileMetadataResponseDTO } from '../dto/response/file-metadata.response.dto.js';
+import { DeleteFileResponseDTO } from '../dto/response/delete-file.response.dto.js';
 
 export class StorageTransformer {
   /**
@@ -209,6 +211,24 @@ export class StorageTransformer {
   ): ConfirmUploadResponseDTO {
     const response = new ConfirmUploadResponseDTO();
     response.file = this.toFileMetadata(file, publicBaseUrl);
+    return response;
+  }
+
+  /**
+   * Maps a FileEntity to FileMetadataResponseDTO.
+   */
+  static toFileMetadataResponse(file: FileEntity, publicBaseUrl?: string): FileMetadataResponseDTO {
+    const response = new FileMetadataResponseDTO();
+    response.file = this.toFileMetadata(file, publicBaseUrl);
+    return response;
+  }
+
+  /**
+   * Maps to DeleteFileResponseDTO.
+   */
+  static toDeleteFileResponse(success: boolean): DeleteFileResponseDTO {
+    const response = new DeleteFileResponseDTO();
+    response.success = success;
     return response;
   }
 }

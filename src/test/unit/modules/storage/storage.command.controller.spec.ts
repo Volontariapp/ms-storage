@@ -6,11 +6,13 @@ import {
   createTestAuthUser,
   createTestConfirmFileAttachmentCommand,
   createTestGenerateUploadUrlCommand,
+  createTestDeleteFileCommand,
 } from './storage.factory.js';
 import { GenerateUploadUrlResponseDTO } from '../../../../modules/storage/dto/response/generate-upload-url.response.dto.js';
 import type { ConfirmFileAttachmentResponseDTO } from '../../../../modules/storage/dto/response/confirm-file-attachment.response.dto.js';
 import { ConfirmUploadCommandDTO } from '../../../../modules/storage/dto/request/command/confirm-upload.command.dto.js';
 import { ConfirmUploadResponseDTO } from '../../../../modules/storage/dto/response/confirm-upload.response.dto.js';
+import { DeleteFileResponseDTO } from '../../../../modules/storage/dto/response/delete-file.response.dto.js';
 
 describe('StorageCommandController (Unit)', () => {
   let controller: StorageCommandController;
@@ -131,6 +133,35 @@ describe('StorageCommandController (Unit)', () => {
       await expect(controller.confirmFileAttachment(command, user)).rejects.toThrow(
         'Reservation failed',
       );
+    });
+  });
+
+  describe('deleteFile', () => {
+    it('should delegate to StorageService with user id and command payload', async () => {
+      const user = createTestAuthUser({ id: 'user-uuid-123' });
+      const command = createTestDeleteFileCommand({ fileId: 'file-uuid-789' });
+
+      const expectedResponse = new DeleteFileResponseDTO();
+      expectedResponse.success = true;
+
+      const deleteFileSpy = jest
+        .spyOn(mockStorageService, 'deleteFile')
+        .mockResolvedValue(expectedResponse);
+
+      const result = await controller.deleteFile(command, user);
+
+      expect(deleteFileSpy).toHaveBeenCalledTimes(1);
+      expect(deleteFileSpy).toHaveBeenCalledWith('user-uuid-123', command);
+      expect(result).toBe(expectedResponse);
+    });
+
+    it('should propagate errors thrown by StorageService', async () => {
+      const user = createTestAuthUser();
+      const command = createTestDeleteFileCommand();
+
+      jest.spyOn(mockStorageService, 'deleteFile').mockRejectedValue(new Error('Deletion failed'));
+
+      await expect(controller.deleteFile(command, user)).rejects.toThrow('Deletion failed');
     });
   });
 });
