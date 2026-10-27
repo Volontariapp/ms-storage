@@ -1,5 +1,5 @@
 # 1. BASE : On prépare l'environnement commun
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 RUN corepack enable && corepack prepare yarn@4.12.0 --activate
@@ -15,7 +15,7 @@ RUN yarn workspaces focus --all --production && yarn cache clean --all
 
 
 # 3. PRODUCTION : L'image finale
-FROM node:24-alpine AS production
+FROM node:26-alpine AS production
 LABEL maintainer="Volontariapp"
 WORKDIR /app
 
