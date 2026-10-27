@@ -1,0 +1,60 @@
+# Dependabot PRs carry docker-and-e2e (required by the CI). Source: Volontariapp/ci-tools templates/dependabot.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker-and-e2e"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      # First match wins: @volontariapp/* always lands in its own PR, on the latest published version.
+      volontariapp:
+        patterns:
+          - "@volontariapp/*"
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+      npm-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+        patterns:
+          - "*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    open-pull-requests-limit: 1
+    labels:
+      - "dependencies"
+      - "docker-and-e2e"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    open-pull-requests-limit: 1
+    labels:
+      - "dependencies"
+      - "docker-and-e2e"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"
+    groups:
+      docker-dependencies:
+        patterns:
+          - "*"
