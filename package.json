@@ -132,6 +132,7 @@
   "resolutions": {
     "glob": "^13.0.6",
     "node-domexception": "1.0.0",
-    "gaxios": "^6.7.1"
+    "gaxios": "^6.7.1",
+    "protobufjs@npm:8.0.0": "npm:8.0.1"
   }
 }
