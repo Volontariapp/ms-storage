@@ -136,6 +136,7 @@
     "protobufjs@npm:8.0.0": "npm:8.4.1",
     "multer@npm:2.4.0": "npm:2.5.0",
     "protobufjs@npm:8.0.1": "npm:8.4.1",
-    "@opentelemetry/propagator-jaeger@npm:2.7.1": "npm:2.9.0"
+    "@opentelemetry/propagator-jaeger@npm:2.7.1": "npm:2.9.0",
+    "webpack@npm:5.106.2": "npm:5.112.2"
   }
 }
