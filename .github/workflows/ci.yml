@@ -15,7 +15,6 @@ jobs:
     secrets: inherit
 
   ci-docker:
-    needs: ci
     permissions:
       contents: read
       packages: write
@@ -36,7 +35,7 @@ jobs:
 
   deploy-push:
     name: Deploy Repo Submodule Push (ms-storage)
-    needs: [ci-docker, e2e]
+    needs: [ci, ci-docker, e2e]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
