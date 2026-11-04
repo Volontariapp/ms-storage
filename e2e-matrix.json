@@ -1,7 +1,12 @@
 {
   "api-gateway": "main",
-  "ms-post": "main",
+  "ms-user": "main",
   "ms-event": "main",
   "ms-social": "main",
-  "ms-user": "main"
+  "ms-post": "main",
+  "ms-ranking": "main",
+  "ws-service": "main",
+  "outbox-runners": "main",
+  "post-processors-runner": "main",
+  "workers-runners": "main"
 }
