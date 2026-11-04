@@ -46,3 +46,17 @@ jobs:
           sha: ${{ github.sha }}
           org-repo-token: ${{ secrets.ORG_REPO_TOKEN }}
           image-match: 'ghcr.io/volontariapp/ms-storage'
+
+  notify-ready:
+    needs: [ci, ci-docker, e2e, validate-e2e-matrix]
+    # `needs:` implies success(): without !failure() a skipped job would skip the notification.
+    if: ${{ !failure() && !cancelled() && github.event_name == 'pull_request' }}
+    # A reusable workflow cannot raise the permissions of its caller.
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    uses: Volontariapp/ci-tools/.github/workflows/pr-ready-notify.yml@main
+    with:
+      channel: backend
+    secrets: inherit
