@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { PostgresFileRepository } from '@volontariapp/domain-storage';
+import { Logger } from '@volontariapp/logger';
 import { requestFilePurge } from '../../../commands/request-file-purge.command.js';
 import {
   createMockPurgeDataSource,
@@ -21,6 +22,27 @@ describe('requestFilePurge', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    Logger.resetDefaultConfig();
+  });
+
+  it('logs with the default logger config set at startup (JSON in production)', async () => {
+    Logger.setDefaultConfig({ format: 'json' });
+    const lines: string[] = [];
+    const capture = (...args: unknown[]): void => {
+      lines.push(args.map(String).join(' '));
+    };
+    jest.spyOn(console, 'log').mockImplementation(capture);
+    jest.spyOn(console, 'info').mockImplementation(capture);
+    requestPurge.mockResolvedValue(true);
+
+    await requestFilePurge({ dataSource, createRepository: () => repository, emitterId });
+
+    const line = lines.find((entry) => entry.includes('File purge requested'));
+    expect(line).toBeDefined();
+    expect(JSON.parse(line ?? '')).toMatchObject({
+      context: 'RequestFilePurgeCommand',
+      message: `File purge requested (emitter ${emitterId})`,
+    });
   });
 
   it('opens the connection, requests the purge with the emitter, then closes it', async () => {

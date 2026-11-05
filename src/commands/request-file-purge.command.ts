@@ -13,8 +13,6 @@ export interface RequestFilePurgeDeps {
   emitterId?: string;
 }
 
-const logger = new Logger({ context: 'RequestFilePurgeCommand' });
-
 /**
  * Periodic safety net of the file purge (docs/stockage-fichiers/07-nettoyage-et-orphelins.md,
  * section 3), run by the ms-storage-purge CronJob: writes one storage.cleanup_files job when
@@ -22,6 +20,8 @@ const logger = new Logger({ context: 'RequestFilePurgeCommand' });
  * worker-storage do the purge. The connection is always closed. Returns whether a job was written.
  */
 export async function requestFilePurge(deps: RequestFilePurgeDeps): Promise<boolean> {
+  // Created here, not at import: the entry point sets the default format (JSON in production) first.
+  const logger = new Logger({ context: 'RequestFilePurgeCommand' });
   const emitterId = deps.emitterId ?? randomUUID();
   if (!deps.dataSource.isInitialized) {
     await deps.dataSource.initialize();
