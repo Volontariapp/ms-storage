@@ -18,7 +18,7 @@ function resolveConfigDirectory(): string {
   throw new Error(`Config directory not found: ${rootConfigDir}`);
 }
 
-const appConfig = loadConfig(resolveConfigDirectory(), CustomConfig);
+export const appConfig = loadConfig(resolveConfigDirectory(), CustomConfig);
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
