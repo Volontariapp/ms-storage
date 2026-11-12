@@ -58,7 +58,7 @@
     "@volontariapp/contracts": "^4.13.2",
     "@volontariapp/contracts-nest": "^3.5.0",
     "@volontariapp/database": "^3.13.2",
-    "@volontariapp/domain-storage": "^0.14.17",
+    "@volontariapp/domain-storage": "^0.14.20",
     "@volontariapp/errors-nest": "^0.14.2",
     "@volontariapp/eslint-config": "^2.2.5",
     "@volontariapp/health-check-nest": "^0.1.45",
